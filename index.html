@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Scroll Swap</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scroll Swap">
+<meta name="theme-color" content="#1C1F1D">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Cpath d='M48 92L78 124L132 56' fill='none' stroke='%237A9B7E' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Cpath d='M48 92L78 124L132 56' fill='none' stroke='%237A9B7E' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+<script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #1C1F1D;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: max(28px, env(safe-area-inset-top));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  #app {
+    --ink: #EDEAE2;
+    --ink-dim: #A8A296;
+    --bg: #1C1F1D;
+    --card: #242824;
+    --card-line: #34392F;
+    --gold: #C9A24B;
+    --sage: #7A9B7E;
+    font-family: Georgia, 'Iowan Old Style', serif;
+    color: var(--ink);
+    background: var(--bg);
+    padding: 8px 22px 40px;
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .header { margin-bottom: 18px; }
+  .eyebrow {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 0 0 6px;
+  }
+  .title {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    margin: 0;
+  }
+
+  .auth-card {
+    margin: 16px 0 20px;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .auth-status {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .auth-email {
+    font-family: Georgia, serif;
+    font-size: 14.5px;
+    color: var(--ink);
+    margin: 2px 0 0;
+  }
+  .auth-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--gold);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .auth-btn:active { opacity: 0.8; }
+  .auth-btn.secondary {
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--card-line);
+  }
+
+  .streak-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0 0 24px;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 10px;
+  }
+  .streak-num {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--gold);
+    font-family: Georgia, serif;
+    line-height: 1;
+  }
+  .streak-label {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .slot {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--card-line);
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  .slot:last-of-type { border-bottom: none; }
+  .slot:active { opacity: 0.7; }
+
+  .box {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    margin-top: 2px;
+    border: 1.5px solid var(--ink-dim);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+  .box.checked {
+    background: var(--sage);
+    border-color: var(--sage);
+  }
+  .box svg { opacity: 0; transition: opacity 0.1s ease; }
+  .box.checked svg { opacity: 1; }
+
+  .slot-text { flex: 1; }
+  .slot-time {
+    font-family: 'Courier New', monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    margin: 0 0 3px;
+  }
+  .slot-swap {
+    font-size: 16px;
+    margin: 0;
+    line-height: 1.3;
+  }
+  .slot.checked .slot-swap { color: var(--ink-dim); text-decoration: line-through; text-decoration-color: var(--card-line); }
+
+  .footer-note {
+    margin-top: 22px;
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    color: var(--ink-dim);
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .sync-note {
+    margin-top: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+
+  .reset-link {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    text-decoration: underline;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 8px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <p class="eyebrow">Daily log</p>
+    <h1 class="title">Scroll Swap</h1>
+    <p class="subtitle">Four slots a day. Beat the reflex, not the urge.</p>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <p class="auth-status">Checking login&hellip;</p>
+  </div>
+
+  <div id="tracker"></div>
+</div>
+
+<script>
+(function() {
+  const STORAGE_PREFIX = 'scrollswap_';
+  const FUNCTION_URL = '/.netlify/functions/habits';
+
+  const SLOTS = [
+    { id: 'wake', time: 'Wake up', swap: 'Music or a podcast on, before the phone comes out' },
+    { id: 'between', time: 'Between classes', swap: 'A few quick chess games instead of reels' },
+    { id: 'evening', time: 'Evening', swap: 'Hoops, a walk, or reading something you chose' },
+    { id: 'before_bed', time: 'Before bed', swap: 'Audio only, screen face-down or out of reach' },
+  ];
+
+  let state = {};
+  let streak = 0;
+  let currentUser = null;
+  let syncing = false;
+
+  function dateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function todayKey() { return STORAGE_PREFIX + dateKey(new Date()); }
+
+  function checkmarkSVG() {
+    return '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#1C1F1D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  function isWin(s) {
+    return Object.values(s).filter(Boolean).length >= 2;
+  }
+
+  function loadToday() {
+    try {
+      const raw = localStorage.getItem(todayKey());
+      state = raw ? JSON.parse(raw) : {};
+    } catch (e) { state = {}; }
+  }
+
+  function saveTodayLocal() {
+    try {
+      localStorage.setItem(todayKey(), JSON.stringify(state));
+    } catch (e) { console.error('Local save failed', e); }
+  }
+
+  function computeStreak() {
+    let count = 0;
+    let cursor = new Date();
+    const todayWin = isWin(state);
+    if (!todayWin) cursor.setDate(cursor.getDate() - 1);
+    for (let i = 0; i < 365; i++) {
+      const raw = localStorage.getItem(STORAGE_PREFIX + dateKey(cursor));
+      if (!raw) break;
+      try {
+        const day = JSON.parse(raw);
+        if (!isWin(day)) break;
+        count++;
+        cursor.setDate(cursor.getDate() - 1);
+      } catch (e) { break; }
+    }
+    streak = count;
+  }
+
+  // ---- Server sync (only when logged in) ----
+
+  function collectAllLocalHistory() {
+    const history = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_PREFIX)) {
+        const date = key.slice(STORAGE_PREFIX.length);
+        try { history[date] = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+      }
+    }
+    return history;
+  }
+
+  function writeHistoryToLocal(history) {
+    Object.keys(history || {}).forEach(date => {
+      localStorage.setItem(STORAGE_PREFIX + date, JSON.stringify(history[date]));
+    });
+  }
+
+  async function pullFromServer() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(FUNCTION_URL, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const serverHistory = await res.json();
+      writeHistoryToLocal(serverHistory);
+    } catch (e) {
+      console.error('Pull failed', e);
+    }
+  }
+
+  async function pushToServer() {
+    if (!currentUser) return;
+    syncing = true;
+    renderSyncNote();
+    try {
+      const token = await currentUser.jwt();
+      const history = collectAllLocalHistory();
+      await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(history),
+      });
+    } catch (e) {
+      console.error('Push failed', e);
+    } finally {
+      syncing = false;
+      renderSyncNote();
+    }
+  }
+
+  function renderSyncNote() {
+    const el = document.getElementById('syncNote');
+    if (!el) return;
+    if (!currentUser) {
+      el.textContent = 'Not synced \u2014 log in to save across devices';
+    } else if (syncing) {
+      el.textContent = 'Syncing\u2026';
+    } else {
+      el.textContent = 'Synced to your account';
+    }
+  }
+
+  // ---- Tracker UI ----
+
+  function renderTracker() {
+    const tracker = document.getElementById('tracker');
+    const checkedCount = Object.values(state).filter(Boolean).length;
+    tracker.innerHTML = `
+      <div class="streak-row">
+        <span class="streak-num">${streak}</span>
+        <span class="streak-label">day streak${streak === 1 ? '' : 's'}<br>(2+ swaps a day)</span>
+      </div>
+      <div class="slots">
+        ${SLOTS.map(s => `
+          <div class="slot ${state[s.id] ? 'checked' : ''}" data-id="${s.id}">
+            <div class="box ${state[s.id] ? 'checked' : ''}">${checkmarkSVG()}</div>
+            <div class="slot-text">
+              <p class="slot-time">${s.time}</p>
+              <p class="slot-swap">${s.swap}</p>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <p class="footer-note">${checkedCount} of 4 today &middot; resets at midnight</p>
+      <p class="sync-note" id="syncNote"></p>
+      <button class="reset-link" id="resetBtn">clear today</button>
+    `;
+
+    tracker.querySelectorAll('.slot').forEach(el => {
+      el.addEventListener('click', async () => {
+        const id = el.dataset.id;
+        state[id] = !state[id];
+        saveTodayLocal();
+        computeStreak();
+        renderTracker();
+        if (currentUser) await pushToServer();
+      });
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', async () => {
+      state = {};
+      saveTodayLocal();
+      computeStreak();
+      renderTracker();
+      if (currentUser) await pushToServer();
+    });
+
+    renderSyncNote();
+  }
+
+  // ---- Auth UI ----
+
+  function renderAuthLoggedOut() {
+    const card = document.getElementById('authCard');
+    card.innerHTML = `
+      <div>
+        <p class="auth-status">Not logged in</p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="auth-btn secondary" id="loginBtn">Log in</button>
+        <button class="auth-btn" id="signupBtn">Sign up</button>
+      </div>
+    `;
+    document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
+    document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+  }
+
+  function renderAuthLoggedIn(user) {
+    const card = document.getElementById('authCard');
+    card.innerHTML = `
+      <div>
+        <p class="auth-status">Logged in</p>
+        <p class="auth-email">${user.email}</p>
+      </div>
+      <button class="auth-btn secondary" id="logoutBtn">Log out</button>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
+  }
+
+  // ---- Init ----
+
+  async function initApp() {
+    loadToday();
+    computeStreak();
+    renderTracker();
+  }
+
+  function initIdentity() {
+    if (typeof netlifyIdentity === 'undefined') {
+      document.getElementById('authCard').innerHTML =
+        '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      return;
+    }
+
+    netlifyIdentity.on('init', async user => {
+      currentUser = user || null;
+      if (user) {
+        renderAuthLoggedIn(user);
+        await pullFromServer();
+      } else {
+        renderAuthLoggedOut();
+      }
+      loadToday();
+      computeStreak();
+      renderTracker();
+    });
+
+    netlifyIdentity.on('login', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      netlifyIdentity.close();
+      await pullFromServer();
+      loadToday();
+      computeStreak();
+      renderTracker();
+      await pushToServer();
+    });
+
+    netlifyIdentity.on('logout', () => {
+      currentUser = null;
+      renderAuthLoggedOut();
+      renderSyncNote();
+    });
+
+    netlifyIdentity.on('signup', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      await pushToServer();
+    });
+
+    netlifyIdentity.init();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    if (typeof netlifyIdentity !== 'undefined') {
+      initIdentity();
+    } else {
+      window.addEventListener('load', initIdentity);
+    }
+  });
+})();
+</script>
+</body>
+</html>
