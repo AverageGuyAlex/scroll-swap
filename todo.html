@@ -51,6 +51,23 @@
   .nav-link:last-child { border-bottom: none; }
   .nav-link.active { color: var(--gold); }
 
+  .gear-btn {
+    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
+    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .gear-dropdown {
+    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
+  }
+  .gear-dropdown.open { display: block; }
+  .gear-status {
+    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
+  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
+
   .header { margin-bottom: 18px; }
   .eyebrow { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
   .title { font-size: 26px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
@@ -142,6 +159,16 @@
     font-family: 'Courier New', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 4px; padding: 2px 5px; flex-shrink: 0;
   }
+  .task-badge.overdue { color: #E07A5F; border-color: #E07A5F; }
+
+  .cat-due-wrap {
+    position: relative; font-family: 'Courier New', monospace; font-size: 10px; color: var(--ink-dim);
+    border: 1px solid var(--card-line); border-radius: 6px; padding: 5px 8px; cursor: pointer; white-space: nowrap;
+  }
+  .cat-due-wrap.overdue { color: #E07A5F; border-color: #E07A5F; }
+  .cat-due-input {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+  }
 
   .add-row-btn {
     background: transparent; border: none; color: var(--ink-dim); font-family: 'Courier New', monospace;
@@ -151,6 +178,31 @@
   .empty-note {
     font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink-dim); text-align: center; padding: 20px 0;
   }
+
+  .archive-toggle-row { text-align: center; margin-top: 20px; }
+  .archive-toggle-btn {
+    font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+    background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 7px;
+    padding: 9px 16px; cursor: pointer;
+  }
+  .archive-panel { display: none; margin-top: 16px; }
+  .archive-panel.open { display: block; }
+  .archive-date-card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; margin-bottom: 10px; overflow: hidden;
+  }
+  .archive-date-header {
+    padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+    font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink);
+  }
+  .archive-date-count { font-size: 11px; color: var(--ink-dim); }
+  .archive-date-body { padding: 0 14px 12px; display: none; }
+  .archive-date-body.open { display: block; }
+  .archive-item {
+    font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--card-line); color: var(--ink-dim);
+  }
+  .archive-item:last-child { border-bottom: none; }
+  .archive-item-path { font-family: 'Courier New', monospace; font-size: 10px; color: var(--ink-dim); display: block; margin-top: 2px; }
+  .archive-empty { font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink-dim); text-align: center; padding: 16px 0; }
 
   .sync-note { margin-top: 16px; font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim); text-align: center; }
 </style>
@@ -165,6 +217,8 @@
       <a href="diary.html" class="nav-link">Diary</a>
       <a href="todo.html" class="nav-link active">To-Do</a>
     </div>
+    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <div class="gear-dropdown" id="gearDropdown"></div>
   </div>
 
   <div class="header">
@@ -179,6 +233,11 @@
 
   <div id="addCatArea"></div>
   <div id="categoriesList"></div>
+
+  <div class="archive-toggle-row">
+    <button class="archive-toggle-btn" id="archiveToggleBtn">View archive</button>
+  </div>
+  <div class="archive-panel" id="archivePanel"></div>
 
   <p class="sync-note" id="syncNote"></p>
 </div>
@@ -284,6 +343,11 @@
       state.completions[key][task.id] = !state.completions[key][task.id];
     } else {
       task.done = !task.done;
+      if (task.done) {
+        task.completedDate = todayKey();
+      } else {
+        delete task.completedDate;
+      }
     }
     await persist();
     renderCategories();
@@ -315,8 +379,8 @@
 
   // ---- Mutations ----
 
-  async function addCategory(name, color) {
-    state.categories.push({ id: uid(), name, color, subcategories: [] });
+  async function addCategory(name, color, dueDate) {
+    state.categories.push({ id: uid(), name, color, dueDate: dueDate || null, subcategories: [] });
     await persist();
   }
 
@@ -330,6 +394,12 @@
   async function updateCategoryColor(catId, color) {
     const cat = state.categories.find(c => c.id === catId);
     if (cat) cat.color = color;
+    await persist();
+  }
+
+  async function updateCategoryDueDate(catId, dueDate) {
+    const cat = state.categories.find(c => c.id === catId);
+    if (cat) cat.dueDate = dueDate || null;
     await persist();
   }
 
@@ -347,10 +417,12 @@
     renderCategories();
   }
 
-  async function addTask(catId, subcatId, text, recurring) {
+  async function addTask(catId, subcatId, text, recurring, scheduledDate) {
     const cat = state.categories.find(c => c.id === catId);
     const subcat = cat && cat.subcategories.find(s => s.id === subcatId);
-    if (subcat) subcat.tasks.push({ id: uid(), text, recurring, done: false });
+    const task = { id: uid(), text, recurring, done: false };
+    if (!recurring && scheduledDate) task.scheduledDate = scheduledDate;
+    if (subcat) subcat.tasks.push(task);
     await persist();
   }
 
@@ -364,6 +436,29 @@
 
   function checkmarkSVG() {
     return '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#1C1F1D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function isOverdue(dateStr, done) {
+    if (!dateStr || done) return false;
+    return dateStr < todayKey();
+  }
+
+  function sortedTasks(subcat) {
+    return [...subcat.tasks].sort((a, b) => {
+      if (a.recurring && !b.recurring) return -1;
+      if (!a.recurring && b.recurring) return 1;
+      if (a.recurring && b.recurring) return 0;
+      const aDate = a.scheduledDate || '9999-99-99';
+      const bDate = b.scheduledDate || '9999-99-99';
+      return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+    });
   }
 
   // ---- Rendering ----
@@ -384,6 +479,10 @@
           <input type="color" class="color-swatch-input" id="newCatColor" value="#C9A24B">
           <input type="text" class="inline-input" id="newCatName" placeholder="Category name (e.g. School)" style="flex:1;">
         </div>
+        <label style="display:flex; align-items:center; gap:8px; font-family:'Courier New', monospace; font-size:12px; color:var(--ink-dim);">
+          Due date (optional)
+          <input type="date" class="inline-input" id="newCatDueDate" style="width:auto; padding:6px 8px;">
+        </label>
         <div class="inline-row">
           <button class="inline-btn cancel" id="cancelCatBtn">Cancel</button>
           <button class="inline-btn confirm" id="confirmCatBtn">Add</button>
@@ -397,8 +496,9 @@
     document.getElementById('confirmCatBtn').addEventListener('click', async () => {
       const name = document.getElementById('newCatName').value.trim();
       const color = document.getElementById('newCatColor').value;
+      const dueDate = document.getElementById('newCatDueDate').value;
       if (!name) return;
-      await addCategory(name, color);
+      await addCategory(name, color, dueDate);
       addingCategory = false;
       renderAddCategoryArea();
       renderCategories();
@@ -420,6 +520,7 @@
   function renderCategoryCard(cat) {
     const complete = isCatComplete(cat);
     const counts = countCatTasks(cat);
+    const dueOverdue = cat.dueDate && !complete && cat.dueDate < todayKey();
     return `
       <div class="cat-card" data-cat-id="${cat.id}">
         <div class="cat-header" style="border-left: 4px solid ${cat.color};">
@@ -428,6 +529,10 @@
           ${counts.total > 0 ? `<span class="task-counter ${counts.done === counts.total ? 'complete' : ''}">${counts.done}/${counts.total}</span>` : ''}
           ${complete ? '<span class="cat-check">&#10003;</span>' : ''}
           <div class="cat-actions">
+            <label class="cat-due-wrap ${dueOverdue ? 'overdue' : ''}" title="Set due date">
+              ${cat.dueDate ? `Due ${formatShortDate(cat.dueDate)}` : 'Set due date'}
+              <input type="date" class="cat-due-input" data-cat-id="${cat.id}" value="${cat.dueDate || ''}">
+            </label>
             <button class="icon-btn delete-cat-btn" data-cat-id="${cat.id}">&times;</button>
           </div>
         </div>
@@ -452,7 +557,7 @@
           <button class="icon-btn delete-subcat-btn" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">&times;</button>
         </div>
         <div class="task-list">
-          ${subcat.tasks.map(t => renderTaskRow(cat.id, subcat.id, t)).join('')}
+          ${sortedTasks(subcat).map(t => renderTaskRow(cat.id, subcat.id, t)).join('')}
         </div>
         ${addingTaskFor && addingTaskFor.categoryId === cat.id && addingTaskFor.subcatId === subcat.id
           ? renderAddTaskForm(cat.id, subcat.id)
@@ -463,6 +568,7 @@
 
   function renderTaskRow(catId, subcatId, task) {
     const done = isTaskDone(task);
+    const overdue = isOverdue(task.scheduledDate, done);
     return `
       <div class="task-row">
         <div class="task-box ${done ? 'checked' : ''}" data-task-id="${task.id}" data-cat-id="${catId}" data-subcat-id="${subcatId}">
@@ -470,6 +576,7 @@
         </div>
         <span class="task-text ${done ? 'checked' : ''}" data-task-id="${task.id}" data-cat-id="${catId}" data-subcat-id="${subcatId}">${task.text}</span>
         ${task.recurring ? '<span class="task-badge">Recurring</span>' : ''}
+        ${task.scheduledDate ? `<span class="task-badge ${overdue ? 'overdue' : ''}">${overdue ? 'Overdue ' : ''}${formatShortDate(task.scheduledDate)}</span>` : ''}
         <button class="icon-btn delete-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">&times;</button>
       </div>
     `;
@@ -494,6 +601,10 @@
         <label style="display:flex; align-items:center; gap:8px; font-family:'Courier New', monospace; font-size:12px; color:var(--ink-dim);">
           <input type="checkbox" class="new-task-recurring" data-cat-id="${catId}" data-subcat-id="${subcatId}">
           Recurring (resets daily)
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; font-family:'Courier New', monospace; font-size:12px; color:var(--ink-dim);">
+          Schedule for (optional)
+          <input type="date" class="inline-input new-task-schedule" data-cat-id="${catId}" data-subcat-id="${subcatId}" style="width:auto; padding:6px 8px;">
         </label>
         <div class="inline-row">
           <button class="inline-btn cancel cancel-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}">Cancel</button>
@@ -564,12 +675,22 @@
         const catId = btn.dataset.catId, subcatId = btn.dataset.subcatId;
         const textInput = document.querySelector(`.new-task-text[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
         const recurringInput = document.querySelector(`.new-task-recurring[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
+        const scheduleInput = document.querySelector(`.new-task-schedule[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
         const text = textInput.value.trim();
         if (!text) return;
-        await addTask(catId, subcatId, text, recurringInput.checked);
+        await addTask(catId, subcatId, text, recurringInput.checked, scheduleInput.value);
         addingTaskFor = null;
         renderCategories();
       });
+    });
+
+    // Category due date change
+    document.querySelectorAll('.cat-due-input').forEach(input => {
+      input.addEventListener('change', async () => {
+        await updateCategoryDueDate(input.dataset.catId, input.value);
+        renderCategories();
+      });
+      input.addEventListener('click', (e) => e.stopPropagation());
     });
 
     // Toggle task
@@ -593,8 +714,11 @@
 
   function renderAuthLoggedOut() {
     const card = document.getElementById('authCard');
+    card.style.display = 'flex';
     card.innerHTML = `
-      <div><p class="auth-status">Not logged in</p></div>
+      <div>
+        <p class="auth-status">Not logged in</p>
+      </div>
       <div style="display:flex; gap:8px;">
         <button class="auth-btn secondary" id="loginBtn">Log in</button>
         <button class="auth-btn" id="signupBtn">Sign up</button>
@@ -602,16 +726,24 @@
     `;
     document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
     document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+
+    const gear = document.getElementById('gearDropdown');
+    gear.innerHTML = `
+      <p class="gear-status">Settings</p>
+      <p class="gear-note">Log in to see account options here.</p>
+    `;
   }
 
   function renderAuthLoggedIn(user) {
     const card = document.getElementById('authCard');
-    card.innerHTML = `
-      <div>
-        <p class="auth-status">Logged in</p>
-        <p class="auth-email">${user.email}</p>
-      </div>
-      <button class="auth-btn secondary" id="logoutBtn">Log out</button>
+    card.style.display = 'none';
+    card.innerHTML = '';
+
+    const gear = document.getElementById('gearDropdown');
+    gear.innerHTML = `
+      <p class="gear-status">Logged in</p>
+      <p class="gear-email">${user.email}</p>
+      <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
@@ -621,11 +753,119 @@
   function initNav() {
     const toggle = document.getElementById('navToggle');
     const dropdown = document.getElementById('navDropdown');
+    const gearToggle = document.getElementById('gearToggle');
+    const gearDropdown = document.getElementById('gearDropdown');
+
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
+      gearDropdown.classList.remove('open');
       dropdown.classList.toggle('open');
     });
-    document.addEventListener('click', () => dropdown.classList.remove('open'));
+    gearToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('open');
+      gearDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => {
+      dropdown.classList.remove('open');
+      gearDropdown.classList.remove('open');
+    });
+  }
+
+  // ---- Archive ----
+
+  let archiveOpen = false;
+
+  function gatherArchiveDates() {
+    const dates = new Set();
+
+    Object.keys(state.completions).forEach(date => {
+      const dayMap = state.completions[date] || {};
+      if (Object.values(dayMap).some(Boolean)) dates.add(date);
+    });
+
+    state.categories.forEach(cat => {
+      cat.subcategories.forEach(sc => {
+        sc.tasks.forEach(t => {
+          if (!t.recurring && t.completedDate) dates.add(t.completedDate);
+        });
+      });
+    });
+
+    return Array.from(dates).sort().reverse();
+  }
+
+  function getArchiveItemsForDate(date) {
+    const items = [];
+    const dayCompletions = state.completions[date] || {};
+
+    state.categories.forEach(cat => {
+      cat.subcategories.forEach(sc => {
+        sc.tasks.forEach(t => {
+          const path = `${cat.name} &gt; ${sc.name}`;
+          if (t.recurring && dayCompletions[t.id]) {
+            items.push({ text: t.text, path, recurring: true });
+          } else if (!t.recurring && t.completedDate === date) {
+            items.push({ text: t.text, path, recurring: false });
+          }
+        });
+      });
+    });
+
+    return items;
+  }
+
+  function formatArchiveDate(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function renderArchivePanel() {
+    const panel = document.getElementById('archivePanel');
+    const dates = gatherArchiveDates();
+
+    if (dates.length === 0) {
+      panel.innerHTML = '<p class="archive-empty">No completed tasks recorded yet</p>';
+      return;
+    }
+
+    panel.innerHTML = dates.map(date => {
+      const items = getArchiveItemsForDate(date);
+      return `
+        <div class="archive-date-card">
+          <div class="archive-date-header" data-date="${date}">
+            <span>${formatArchiveDate(date)}</span>
+            <span class="archive-date-count">${items.length} completed</span>
+          </div>
+          <div class="archive-date-body" id="archive-body-${date}">
+            ${items.map(item => `
+              <div class="archive-item">
+                ${item.text}
+                <span class="archive-item-path">${item.path}${item.recurring ? ' &middot; Recurring' : ''}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    panel.querySelectorAll('.archive-date-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const body = document.getElementById(`archive-body-${header.dataset.date}`);
+        body.classList.toggle('open');
+      });
+    });
+  }
+
+  function initArchiveToggle() {
+    const btn = document.getElementById('archiveToggleBtn');
+    const panel = document.getElementById('archivePanel');
+    btn.addEventListener('click', () => {
+      archiveOpen = !archiveOpen;
+      panel.classList.toggle('open', archiveOpen);
+      btn.textContent = archiveOpen ? 'Hide archive' : 'View archive';
+      if (archiveOpen) renderArchivePanel();
+    });
   }
 
   // ---- Init ----
@@ -635,6 +875,7 @@
     renderAddCategoryArea();
     renderCategories();
     initNav();
+    initArchiveToggle();
   }
 
   function initIdentity() {
