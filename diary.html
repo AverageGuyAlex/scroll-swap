@@ -72,6 +72,23 @@
   }
   .nav-link:last-child { border-bottom: none; }
   .nav-link.active { color: var(--gold); }
+
+  .gear-btn {
+    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
+    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .gear-dropdown {
+    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
+  }
+  .gear-dropdown.open { display: block; }
+  .gear-status {
+    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
+  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
   .nav-link.disabled { opacity: 0.4; pointer-events: none; }
 
   .header { margin-bottom: 18px; }
@@ -188,6 +205,8 @@
       <a href="diary.html" class="nav-link active">Diary</a>
       <a href="todo.html" class="nav-link">To-Do</a>
     </div>
+    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <div class="gear-dropdown" id="gearDropdown"></div>
   </div>
 
   <div class="header">
@@ -367,6 +386,17 @@
 
   // ---- Calendar rendering ----
 
+  function ratingToHue(rating) {
+    // 1 = red (0), 5 = yellow (60), 10 = green (120), gradual in between
+    if (rating <= 5) return (rating - 1) / 4 * 60;
+    return 60 + (rating - 5) / 5 * 60;
+  }
+
+  function ratingBackground(rating) {
+    const hue = ratingToHue(rating);
+    return `hsl(${hue}, 42%, 30%)`;
+  }
+
   function renderCalendar() {
     document.getElementById('calMonthLabel').textContent = `${MONTH_NAMES[viewMonth]} ${viewYear}`;
     const grid = document.getElementById('calGrid');
@@ -387,11 +417,19 @@
 
     for (let day = 1; day <= daysInMonth; day++) {
       const key = dateKeyFromParts(viewYear, viewMonth, day);
-      const hasEntry = !!(diaryEntries[key] && (diaryEntries[key].title || diaryEntries[key].text));
+      const entry = diaryEntries[key];
+      const hasEntry = !!(entry && (entry.title || entry.text));
+      const rating = entry && typeof entry.rating === 'number' ? entry.rating : null;
       const classes = ['cal-day'];
       if (key === todayKey) classes.push('today');
       if (key === selectedKey) classes.push('selected');
-      html += `<button class="${classes.join(' ')}" data-date="${key}">${day}${hasEntry ? '<span class="cal-dot"></span>' : ''}</button>`;
+
+      let styleAttr = '';
+      if (rating !== null && key !== selectedKey) {
+        styleAttr = ` style="background:${ratingBackground(rating)};"`;
+      }
+
+      html += `<button class="${classes.join(' ')}" data-date="${key}"${styleAttr}>${day}${hasEntry ? '<span class="cal-dot"></span>' : ''}</button>`;
     }
 
     grid.innerHTML = html;
@@ -480,8 +518,11 @@
 
   function renderAuthLoggedOut() {
     const card = document.getElementById('authCard');
+    card.style.display = 'flex';
     card.innerHTML = `
-      <div><p class="auth-status">Not logged in</p></div>
+      <div>
+        <p class="auth-status">Not logged in</p>
+      </div>
       <div style="display:flex; gap:8px;">
         <button class="auth-btn secondary" id="loginBtn">Log in</button>
         <button class="auth-btn" id="signupBtn">Sign up</button>
@@ -489,16 +530,24 @@
     `;
     document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
     document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+
+    const gear = document.getElementById('gearDropdown');
+    gear.innerHTML = `
+      <p class="gear-status">Settings</p>
+      <p class="gear-note">Log in to see account options here.</p>
+    `;
   }
 
   function renderAuthLoggedIn(user) {
     const card = document.getElementById('authCard');
-    card.innerHTML = `
-      <div>
-        <p class="auth-status">Logged in</p>
-        <p class="auth-email">${user.email}</p>
-      </div>
-      <button class="auth-btn secondary" id="logoutBtn">Log out</button>
+    card.style.display = 'none';
+    card.innerHTML = '';
+
+    const gear = document.getElementById('gearDropdown');
+    gear.innerHTML = `
+      <p class="gear-status">Logged in</p>
+      <p class="gear-email">${user.email}</p>
+      <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
@@ -508,11 +557,23 @@
   function initNav() {
     const toggle = document.getElementById('navToggle');
     const dropdown = document.getElementById('navDropdown');
+    const gearToggle = document.getElementById('gearToggle');
+    const gearDropdown = document.getElementById('gearDropdown');
+
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
+      gearDropdown.classList.remove('open');
       dropdown.classList.toggle('open');
     });
-    document.addEventListener('click', () => dropdown.classList.remove('open'));
+    gearToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('open');
+      gearDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => {
+      dropdown.classList.remove('open');
+      gearDropdown.classList.remove('open');
+    });
   }
 
   // ---- Month navigation ----
