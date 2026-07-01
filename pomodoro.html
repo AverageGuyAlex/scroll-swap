@@ -102,6 +102,23 @@
   }
   .nav-link:last-child { border-bottom: none; }
   .nav-link.active { color: var(--gold); }
+
+  .gear-btn {
+    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
+    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .gear-dropdown {
+    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
+  }
+  .gear-dropdown.open { display: block; }
+  .gear-status {
+    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
+  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
   .nav-link.disabled { opacity: 0.4; pointer-events: none; }
 
   .header { margin-bottom: 18px; }
@@ -319,6 +336,31 @@
     padding: 9px 16px;
     cursor: pointer;
   }
+  .range-toggle-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    width: 100%;
+  }
+  .range-btn {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: var(--bg);
+    color: var(--ink-dim);
+    border: 1px solid var(--card-line);
+    border-radius: 7px;
+    padding: 8px 6px;
+    cursor: pointer;
+  }
+  .range-btn.selected {
+    background: var(--gold);
+    color: var(--bg);
+    border-color: var(--gold);
+    font-weight: 600;
+  }
   .chart-wrap {
     display: none;
     flex-direction: column;
@@ -378,6 +420,8 @@
       <a href="diary.html" class="nav-link">Diary</a>
       <a href="todo.html" class="nav-link">To-Do</a>
     </div>
+    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <div class="gear-dropdown" id="gearDropdown"></div>
   </div>
 
   <div class="header">
@@ -413,6 +457,11 @@
     <button class="chart-toggle-btn" id="chartToggleBtn">Show pie chart</button>
   </div>
   <div class="chart-wrap" id="chartWrap">
+    <div class="range-toggle-row" id="rangeToggleRow">
+      <button class="range-btn selected" data-range="1">Today</button>
+      <button class="range-btn" data-range="7">Last 7 days</button>
+      <button class="range-btn" data-range="30">Last 30 days</button>
+    </div>
     <div class="pie" id="pieCircle"></div>
     <div class="chart-legend" id="chartLegend"></div>
   </div>
@@ -645,18 +694,44 @@
   // ---- Pie chart ----
 
   let chartOpen = false;
+  let chartRange = 1; // 1, 7, or 30 days
+
+  function getTotalsForRange(days) {
+    const totals = {};
+    const cursor = new Date();
+    for (let i = 0; i < days; i++) {
+      const key = STORAGE_PREFIX + dateKey(cursor);
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const dayTotals = JSON.parse(raw);
+          Object.keys(dayTotals).forEach(catId => {
+            totals[catId] = (totals[catId] || 0) + (dayTotals[catId] || 0);
+          });
+        }
+      } catch (e) {}
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return totals;
+  }
+
+  function rangeLabel(days) {
+    if (days === 1) return 'today';
+    return `the last ${days} days`;
+  }
 
   function renderChart() {
     const pie = document.getElementById('pieCircle');
     const legend = document.getElementById('chartLegend');
     if (!pie || !legend) return;
 
-    const total = CATEGORIES.reduce((sum, c) => sum + (todayTotals[c.id] || 0), 0);
+    const rangeTotals = getTotalsForRange(chartRange);
+    const total = CATEGORIES.reduce((sum, c) => sum + (rangeTotals[c.id] || 0), 0);
 
     if (total === 0) {
       pie.classList.add('empty');
       pie.style.background = '';
-      legend.innerHTML = '<p class="chart-empty-note">No sessions logged yet today</p>';
+      legend.innerHTML = `<p class="chart-empty-note">No sessions logged for ${rangeLabel(chartRange)}</p>`;
       return;
     }
 
@@ -664,7 +739,7 @@
 
     let cursor = 0;
     const segments = CATEGORIES.map(c => {
-      const minutes = todayTotals[c.id] || 0;
+      const minutes = rangeTotals[c.id] || 0;
       const pct = (minutes / total) * 100;
       const start = cursor;
       const end = cursor + pct;
@@ -699,14 +774,26 @@
       btn.textContent = chartOpen ? 'Hide pie chart' : 'Show pie chart';
       if (chartOpen) renderChart();
     });
+
+    document.querySelectorAll('.range-btn').forEach(rangeBtn => {
+      rangeBtn.addEventListener('click', () => {
+        chartRange = parseInt(rangeBtn.dataset.range, 10);
+        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('selected'));
+        rangeBtn.classList.add('selected');
+        renderChart();
+      });
+    });
   }
 
   // ---- Auth UI ----
 
   function renderAuthLoggedOut() {
     const card = document.getElementById('authCard');
+    card.style.display = 'flex';
     card.innerHTML = `
-      <div><p class="auth-status">Not logged in</p></div>
+      <div>
+        <p class="auth-status">Not logged in</p>
+      </div>
       <div style="display:flex; gap:8px;">
         <button class="auth-btn secondary" id="loginBtn">Log in</button>
         <button class="auth-btn" id="signupBtn">Sign up</button>
@@ -714,16 +801,24 @@
     `;
     document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
     document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+
+    const gear = document.getElementById('gearDropdown');
+    gear.innerHTML = `
+      <p class="gear-status">Settings</p>
+      <p class="gear-note">Log in to see account options here.</p>
+    `;
   }
 
   function renderAuthLoggedIn(user) {
     const card = document.getElementById('authCard');
-    card.innerHTML = `
-      <div>
-        <p class="auth-status">Logged in</p>
-        <p class="auth-email">${user.email}</p>
-      </div>
-      <button class="auth-btn secondary" id="logoutBtn">Log out</button>
+    card.style.display = 'none';
+    card.innerHTML = '';
+
+    const gear = document.getElementById('gearDropdown');
+    gear.innerHTML = `
+      <p class="gear-status">Logged in</p>
+      <p class="gear-email">${user.email}</p>
+      <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
@@ -733,11 +828,23 @@
   function initNav() {
     const toggle = document.getElementById('navToggle');
     const dropdown = document.getElementById('navDropdown');
+    const gearToggle = document.getElementById('gearToggle');
+    const gearDropdown = document.getElementById('gearDropdown');
+
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
+      gearDropdown.classList.remove('open');
       dropdown.classList.toggle('open');
     });
-    document.addEventListener('click', () => dropdown.classList.remove('open'));
+    gearToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('open');
+      gearDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => {
+      dropdown.classList.remove('open');
+      gearDropdown.classList.remove('open');
+    });
   }
 
   // ---- Init ----
