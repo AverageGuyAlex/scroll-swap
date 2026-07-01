@@ -303,12 +303,27 @@
   const STORAGE_PREFIX = 'scrollswap_';
   const FUNCTION_URL = '/.netlify/functions/habits';
 
-  const SLOTS = [
+  const DEFAULT_SLOTS = [
     { id: 'wake', time: 'Wake up', swap: 'Music or a podcast on, before the phone comes out' },
-    { id: 'between', time: 'Between classes', swap: 'A few quick chess games instead of reels' },
+    { id: 'morning', time: 'Morning', swap: 'Stretch, eat breakfast, or read something short before opening socials' },
+    { id: 'between', time: 'Afternoon', swap: 'A few quick chess games instead of reels' },
     { id: 'evening', time: 'Evening', swap: 'Hoops, a walk, or reading something you chose' },
     { id: 'before_bed', time: 'Before bed', swap: 'Audio only, screen face-down or out of reach' },
   ];
+
+  let customLabels = {}; // { [slotId]: { time, swap } }
+
+  function getSlots() {
+    return DEFAULT_SLOTS.map(s => ({
+      id: s.id,
+      time: (customLabels[s.id] && customLabels[s.id].time) || s.time,
+      swap: (customLabels[s.id] && customLabels[s.id].swap) || s.swap,
+    }));
+  }
+
+  function winThreshold() {
+    return Math.ceil(DEFAULT_SLOTS.length / 2);
+  }
 
   let state = {};
   let streak = 0;
@@ -325,7 +340,7 @@
   }
 
   function isWin(s) {
-    return Object.values(s).filter(Boolean).length >= 2;
+    return Object.values(s).filter(Boolean).length >= winThreshold();
   }
 
   function loadToday() {
@@ -333,6 +348,21 @@
       const raw = localStorage.getItem(todayKey());
       state = raw ? JSON.parse(raw) : {};
     } catch (e) { state = {}; }
+  }
+
+  function labelsKey() { return STORAGE_PREFIX + '_labels'; }
+
+  function loadLabelsLocal() {
+    try {
+      const raw = localStorage.getItem(labelsKey());
+      customLabels = raw ? JSON.parse(raw) : {};
+    } catch (e) { customLabels = {}; }
+  }
+
+  function saveLabelsLocal() {
+    try {
+      localStorage.setItem(labelsKey(), JSON.stringify(customLabels));
+    } catch (e) { console.error('Label save failed', e); }
   }
 
   function saveTodayLocal() {
@@ -431,16 +461,27 @@
 
   // ---- Tracker UI ----
 
+  let editMode = false;
+
   function renderTracker() {
+    if (editMode) {
+      renderEditView();
+    } else {
+      renderNormalView();
+    }
+  }
+
+  function renderNormalView() {
     const tracker = document.getElementById('tracker');
     const checkedCount = Object.values(state).filter(Boolean).length;
+    const slots = getSlots();
     tracker.innerHTML = `
       <div class="streak-row">
         <span class="streak-num">${streak}</span>
-        <span class="streak-label">day streak${streak === 1 ? '' : 's'}<br>(2+ swaps a day)</span>
+        <span class="streak-label">day streak${streak === 1 ? '' : 's'}<br>(${winThreshold()}+ swaps a day)</span>
       </div>
       <div class="slots">
-        ${SLOTS.map(s => `
+        ${slots.map(s => `
           <div class="slot ${state[s.id] ? 'checked' : ''}" data-id="${s.id}">
             <div class="box ${state[s.id] ? 'checked' : ''}">${checkmarkSVG()}</div>
             <div class="slot-text">
@@ -450,9 +491,12 @@
           </div>
         `).join('')}
       </div>
-      <p class="footer-note">${checkedCount} of 4 today &middot; resets at midnight</p>
+      <p class="footer-note">${checkedCount} of ${slots.length} today &middot; resets at midnight</p>
       <p class="sync-note" id="syncNote"></p>
-      <button class="reset-link" id="resetBtn">clear today</button>
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="reset-link" id="resetBtn" style="flex:1;">clear today</button>
+        <button class="reset-link" id="editBtn" style="flex:1;">edit text</button>
+      </div>
     `;
 
     tracker.querySelectorAll('.slot').forEach(el => {
@@ -474,7 +518,58 @@
       if (currentUser) await pushToServer();
     });
 
+    document.getElementById('editBtn').addEventListener('click', () => {
+      editMode = true;
+      renderTracker();
+    });
+
     renderSyncNote();
+  }
+
+  function renderEditView() {
+    const tracker = document.getElementById('tracker');
+    const slots = getSlots();
+    tracker.innerHTML = `
+      <p class="footer-note" style="margin-top:0; margin-bottom:16px;">Edit the label and swap idea for each slot below.</p>
+      <div class="slots">
+        ${slots.map(s => `
+          <div class="slot" style="cursor:default; flex-direction:column; align-items:stretch; gap:8px;">
+            <input type="text" class="duration-input edit-time-input" data-id="${s.id}" value="${s.time.replace(/"/g, '&quot;')}"
+              style="width:100%; text-align:left; padding:10px;">
+            <textarea class="duration-input edit-swap-input" data-id="${s.id}" rows="2"
+              style="width:100%; text-align:left; padding:10px; resize:vertical; font-family:Georgia, serif; font-size:15px;">${s.swap}</textarea>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="reset-link" id="cancelEditBtn" style="flex:1;">cancel</button>
+        <button class="reset-link" id="saveEditBtn" style="flex:1; color:var(--sage);">save</button>
+      </div>
+    `;
+
+    document.getElementById('cancelEditBtn').addEventListener('click', () => {
+      editMode = false;
+      renderTracker();
+    });
+
+    document.getElementById('saveEditBtn').addEventListener('click', async () => {
+      const timeInputs = tracker.querySelectorAll('.edit-time-input');
+      const swapInputs = tracker.querySelectorAll('.edit-swap-input');
+      timeInputs.forEach(input => {
+        const id = input.dataset.id;
+        customLabels[id] = customLabels[id] || {};
+        customLabels[id].time = input.value.trim() || DEFAULT_SLOTS.find(d => d.id === id).time;
+      });
+      swapInputs.forEach(input => {
+        const id = input.dataset.id;
+        customLabels[id] = customLabels[id] || {};
+        customLabels[id].swap = input.value.trim() || DEFAULT_SLOTS.find(d => d.id === id).swap;
+      });
+      saveLabelsLocal();
+      editMode = false;
+      renderTracker();
+      if (currentUser) await pushToServer();
+    });
   }
 
   // ---- Auth UI ----
@@ -522,6 +617,7 @@
 
   async function initApp() {
     loadToday();
+    loadLabelsLocal();
     computeStreak();
     renderTracker();
     initNav();
@@ -543,6 +639,7 @@
         renderAuthLoggedOut();
       }
       loadToday();
+      loadLabelsLocal();
       computeStreak();
       renderTracker();
     });
@@ -553,6 +650,7 @@
       netlifyIdentity.close();
       await pullFromServer();
       loadToday();
+      loadLabelsLocal();
       computeStreak();
       renderTracker();
       await pushToServer();
