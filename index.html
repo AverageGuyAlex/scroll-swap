@@ -50,6 +50,55 @@
     margin: 0 auto;
   }
 
+  .nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .nav-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--card-line);
+    border-radius: 7px;
+    padding: 9px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-dropdown {
+    position: absolute;
+    top: 42px;
+    left: 0;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 10;
+    min-width: 190px;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nav-dropdown.open { display: block; }
+  .nav-link {
+    display: block;
+    padding: 12px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    text-decoration: none;
+    border-bottom: 1px solid var(--card-line);
+  }
+  .nav-link:last-child { border-bottom: none; }
+  .nav-link.active { color: var(--gold); }
+  .nav-link.disabled { opacity: 0.4; pointer-events: none; }
+
   .header { margin-bottom: 18px; }
   .eyebrow {
     font-family: 'Courier New', monospace;
@@ -226,6 +275,16 @@
 </head>
 <body>
 <div id="app">
+  <div class="nav-row">
+    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="index.html" class="nav-link active">Scroll Swap</a>
+      <a href="pomodoro.html" class="nav-link">Pomodoro</a>
+      <a href="#" class="nav-link disabled">Diary (coming soon)</a>
+      <a href="#" class="nav-link disabled">To-Do (coming soon)</a>
+    </div>
+  </div>
+
   <div class="header">
     <p class="eyebrow">Daily log</p>
     <h1 class="title">Scroll Swap</h1>
@@ -447,12 +506,25 @@
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
 
+  // ---- Nav dropdown ----
+
+  function initNav() {
+    const toggle = document.getElementById('navToggle');
+    const dropdown = document.getElementById('navDropdown');
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => dropdown.classList.remove('open'));
+  }
+
   // ---- Init ----
 
   async function initApp() {
     loadToday();
     computeStreak();
     renderTracker();
+    initNav();
   }
 
   function initIdentity() {
