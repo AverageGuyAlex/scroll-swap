@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Diary &middot; Scroll Swap</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Diary">
+<meta name="theme-color" content="#1C1F1D">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Crect x='52' y='50' width='76' height='84' rx='6' fill='none' stroke='%237A9B7E' stroke-width='8'/%3E%3Cline x1='66' y1='72' x2='114' y2='72' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='66' y1='92' x2='114' y2='92' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='66' y1='112' x2='96' y2='112' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='52' y='50' width='76' height='84' rx='6' fill='none' stroke='%237A9B7E' stroke-width='8'/%3E%3Cline x1='66' y1='72' x2='114' y2='72' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='66' y1='92' x2='114' y2='92' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='66' y1='112' x2='96' y2='112' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #1C1F1D;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: max(28px, env(safe-area-inset-top));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  #app {
+    --ink: #EDEAE2;
+    --ink-dim: #A8A296;
+    --bg: #1C1F1D;
+    --card: #242824;
+    --card-line: #34392F;
+    --gold: #C9A24B;
+    --sage: #7A9B7E;
+    --cat-productivity: #6FA37A;
+    --cat-workout: #C1503F;
+    --cat-reading: #D9B54A;
+    font-family: Georgia, 'Iowan Old Style', serif;
+    color: var(--ink);
+    background: var(--bg);
+    padding: 8px 22px 40px;
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* Nav */
+  .nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; position: relative; }
+  .nav-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--card); color: var(--ink); border: 1px solid var(--card-line); border-radius: 7px;
+    padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-dropdown {
+    position: absolute; top: 42px; left: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 190px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nav-dropdown.open { display: block; }
+  .nav-link {
+    display: block; padding: 12px 16px; font-family: 'Courier New', monospace; font-size: 12.5px;
+    color: var(--ink-dim); text-decoration: none; border-bottom: 1px solid var(--card-line);
+  }
+  .nav-link:last-child { border-bottom: none; }
+  .nav-link.active { color: var(--gold); }
+  .nav-link.disabled { opacity: 0.4; pointer-events: none; }
+
+  .header { margin-bottom: 18px; }
+  .eyebrow {
+    font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 6px;
+  }
+  .title { font-size: 26px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink-dim); margin: 0; }
+
+  .auth-card {
+    margin: 16px 0 20px; padding: 14px 16px; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .auth-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
+  .auth-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 2px 0 0; }
+  .auth-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--gold); color: var(--bg); border: none; border-radius: 6px; padding: 9px 14px;
+    cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  .auth-btn.secondary { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+
+  /* Calendar */
+  .cal-card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 14px; padding: 18px; margin-bottom: 18px;
+  }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .cal-month {
+    font-family: Georgia, serif; font-size: 17px; font-weight: 600; color: var(--ink);
+  }
+  .cal-nav-btn {
+    background: transparent; border: 1px solid var(--card-line); color: var(--ink-dim);
+    border-radius: 6px; width: 32px; height: 32px; cursor: pointer; font-size: 15px;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow {
+    font-family: 'Courier New', monospace; font-size: 9.5px; text-transform: uppercase; color: var(--ink-dim);
+    text-align: center; padding-bottom: 6px;
+  }
+  .cal-day {
+    aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 8px; cursor: pointer; font-size: 13.5px; color: var(--ink); position: relative; background: transparent; border: none;
+  }
+  .cal-day.empty { cursor: default; }
+  .cal-day.today { border: 1px solid var(--gold); }
+  .cal-day.selected { background: var(--sage); color: var(--bg); font-weight: 600; }
+  .cal-dot {
+    width: 4px; height: 4px; border-radius: 50%; background: var(--gold); margin-top: 2px;
+  }
+  .cal-day.selected .cal-dot { background: var(--bg); }
+
+  /* Entry panel */
+  .entry-card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 14px; padding: 20px; margin-bottom: 18px;
+  }
+  .entry-date {
+    font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--gold); margin: 0 0 14px;
+  }
+  .field-label {
+    font-family: 'Courier New', monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-dim); margin: 0 0 6px;
+  }
+  .title-input {
+    width: 100%; font-family: Georgia, serif; font-size: 17px; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--card-line); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px;
+  }
+  .rating-row { display: flex; gap: 5px; margin-bottom: 16px; flex-wrap: wrap; }
+  .rating-btn {
+    width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--card-line); background: var(--bg);
+    color: var(--ink-dim); font-family: 'Courier New', monospace; font-size: 12px; cursor: pointer;
+  }
+  .rating-btn.selected { background: var(--gold); color: var(--bg); border-color: var(--gold); font-weight: 700; }
+  .log-textarea {
+    width: 100%; font-family: Georgia, serif; font-size: 15px; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--card-line); border-radius: 8px; padding: 12px; resize: vertical; margin-bottom: 16px; line-height: 1.5;
+  }
+  .save-btn {
+    width: 100%; font-family: 'Courier New', monospace; font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--sage); color: var(--bg); border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-weight: 600;
+  }
+  .save-note {
+    text-align: center; font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim); margin-top: 10px; min-height: 14px;
+  }
+
+  /* Pomodoro totals mini display */
+  .pomo-mini-title {
+    font-family: 'Courier New', monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-dim); margin: 0 0 10px;
+  }
+  .pomo-mini-row {
+    display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; font-size: 13.5px;
+  }
+  .pomo-mini-name { display: flex; align-items: center; gap: 8px; }
+  .pomo-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pomo-mini-mins { font-family: 'Courier New', monospace; font-size: 12px; }
+  .pomo-mini-empty {
+    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-align: center; padding: 6px 0;
+  }
+
+  .sync-note {
+    margin-top: 6px; font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim); text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="nav-row">
+    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="pomodoro.html" class="nav-link">Pomodoro</a>
+      <a href="diary.html" class="nav-link active">Diary</a>
+      <a href="#" class="nav-link disabled">To-Do (coming soon)</a>
+    </div>
+  </div>
+
+  <div class="header">
+    <p class="eyebrow">Daily log</p>
+    <h1 class="title">Diary</h1>
+    <p class="subtitle">Tap a date to write or review that day.</p>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <p class="auth-status">Checking login&hellip;</p>
+  </div>
+
+  <div class="cal-card">
+    <div class="cal-header">
+      <button class="cal-nav-btn" id="prevMonthBtn">&#8249;</button>
+      <span class="cal-month" id="calMonthLabel"></span>
+      <button class="cal-nav-btn" id="nextMonthBtn">&#8250;</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <div class="entry-card">
+    <p class="entry-date" id="entryDateLabel"></p>
+
+    <p class="field-label">Title</p>
+    <input type="text" class="title-input" id="titleInput" placeholder="A word or two for the day">
+
+    <p class="field-label">Productivity rating</p>
+    <div class="rating-row" id="ratingRow"></div>
+
+    <p class="field-label">What did you do today?</p>
+    <textarea class="log-textarea" id="logTextarea" rows="5" placeholder="Write freely&hellip;"></textarea>
+
+    <button class="save-btn" id="saveEntryBtn">Save entry</button>
+    <p class="save-note" id="saveNote"></p>
+  </div>
+
+  <div class="entry-card">
+    <p class="pomo-mini-title">Pomodoro time this day</p>
+    <div id="pomoMiniList"></div>
+  </div>
+
+  <p class="sync-note" id="syncNote"></p>
+</div>
+
+<script>
+(function() {
+  const DIARY_PREFIX = 'diary_';
+  const POMODORO_PREFIX = 'pomodoro_';
+  const DIARY_FUNCTION_URL = '/.netlify/functions/diary';
+  const POMODORO_FUNCTION_URL = '/.netlify/functions/pomodoro';
+
+  const POMO_CATEGORIES = [
+    { id: 'productivity', label: 'Productivity', color: 'var(--cat-productivity)' },
+    { id: 'workout', label: 'Working Out', color: 'var(--cat-workout)' },
+    { id: 'reading', label: 'Reading', color: 'var(--cat-reading)' },
+  ];
+
+  let currentUser = null;
+  let syncing = false;
+  let viewYear, viewMonth; // 0-indexed month
+  let selectedDate = new Date();
+  let diaryEntries = {}; // { 'YYYY-MM-DD': { title, rating, text } }
+  let pomodoroHistory = {}; // { 'YYYY-MM-DD': { productivity, workout, reading } }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function dateKeyFromParts(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
+  function dateKeyFromDate(d) { return dateKeyFromParts(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DOW_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  // ---- Local storage ----
+
+  function loadDiaryLocal() {
+    diaryEntries = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(DIARY_PREFIX)) {
+        const date = key.slice(DIARY_PREFIX.length);
+        try { diaryEntries[date] = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+      }
+    }
+  }
+
+  function saveDiaryEntryLocal(date, entry) {
+    diaryEntries[date] = entry;
+    try {
+      localStorage.setItem(DIARY_PREFIX + date, JSON.stringify(entry));
+    } catch (e) { console.error('Diary save failed', e); }
+  }
+
+  function loadPomodoroLocal() {
+    pomodoroHistory = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(POMODORO_PREFIX)) {
+        const date = key.slice(POMODORO_PREFIX.length);
+        try { pomodoroHistory[date] = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+      }
+    }
+  }
+
+  // ---- Server sync ----
+
+  function collectDiaryHistory() {
+    const history = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(DIARY_PREFIX)) {
+        const date = key.slice(DIARY_PREFIX.length);
+        try { history[date] = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+      }
+    }
+    return history;
+  }
+
+  function writeDiaryHistoryToLocal(history) {
+    Object.keys(history || {}).forEach(date => {
+      localStorage.setItem(DIARY_PREFIX + date, JSON.stringify(history[date]));
+    });
+  }
+
+  async function pullDiaryFromServer() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(DIARY_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const serverHistory = await res.json();
+      writeDiaryHistoryToLocal(serverHistory);
+    } catch (e) { console.error('Diary pull failed', e); }
+  }
+
+  async function pushDiaryToServer() {
+    if (!currentUser) return;
+    syncing = true;
+    renderSyncNote();
+    try {
+      const token = await currentUser.jwt();
+      const history = collectDiaryHistory();
+      await fetch(DIARY_FUNCTION_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(history),
+      });
+    } catch (e) {
+      console.error('Diary push failed', e);
+    } finally {
+      syncing = false;
+      renderSyncNote();
+    }
+  }
+
+  // Pomodoro is read-only from Diary's perspective: pull latest, but never push
+  async function pullPomodoroFromServer() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(POMODORO_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const serverHistory = await res.json();
+      Object.keys(serverHistory || {}).forEach(date => {
+        localStorage.setItem(POMODORO_PREFIX + date, JSON.stringify(serverHistory[date]));
+      });
+      loadPomodoroLocal();
+    } catch (e) { console.error('Pomodoro pull failed', e); }
+  }
+
+  function renderSyncNote() {
+    const el = document.getElementById('syncNote');
+    if (!el) return;
+    if (!currentUser) el.textContent = 'Not synced \u2014 log in to save across devices';
+    else if (syncing) el.textContent = 'Syncing\u2026';
+    else el.textContent = 'Synced to your account';
+  }
+
+  // ---- Calendar rendering ----
+
+  function renderCalendar() {
+    document.getElementById('calMonthLabel').textContent = `${MONTH_NAMES[viewMonth]} ${viewYear}`;
+    const grid = document.getElementById('calGrid');
+
+    const firstOfMonth = new Date(viewYear, viewMonth, 1);
+    let firstWeekday = firstOfMonth.getDay(); // 0 = Sunday
+    firstWeekday = (firstWeekday + 6) % 7; // convert to Monday-first index
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+    const todayKey = dateKeyFromDate(new Date());
+    const selectedKey = dateKeyFromDate(selectedDate);
+
+    let html = DOW_LABELS.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+    for (let i = 0; i < firstWeekday; i++) {
+      html += `<div class="cal-day empty"></div>`;
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = dateKeyFromParts(viewYear, viewMonth, day);
+      const hasEntry = !!(diaryEntries[key] && (diaryEntries[key].title || diaryEntries[key].text));
+      const classes = ['cal-day'];
+      if (key === todayKey) classes.push('today');
+      if (key === selectedKey) classes.push('selected');
+      html += `<button class="${classes.join(' ')}" data-date="${key}">${day}${hasEntry ? '<span class="cal-dot"></span>' : ''}</button>`;
+    }
+
+    grid.innerHTML = html;
+
+    grid.querySelectorAll('.cal-day:not(.empty)').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const [y, m, d] = btn.dataset.date.split('-').map(Number);
+        selectedDate = new Date(y, m - 1, d);
+        renderCalendar();
+        renderEntryPanel();
+        renderPomodoroMini();
+      });
+    });
+  }
+
+  // ---- Entry panel ----
+
+  function renderRatingRow(currentRating) {
+    const row = document.getElementById('ratingRow');
+    row.innerHTML = '';
+    for (let i = 1; i <= 10; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'rating-btn' + (i === currentRating ? ' selected' : '');
+      btn.textContent = i;
+      btn.dataset.value = i;
+      btn.addEventListener('click', () => {
+        row.dataset.selected = i;
+        row.querySelectorAll('.rating-btn').forEach(b => b.classList.toggle('selected', Number(b.dataset.value) === i));
+      });
+      row.appendChild(btn);
+    }
+    row.dataset.selected = currentRating || '';
+  }
+
+  function renderEntryPanel() {
+    const key = dateKeyFromDate(selectedDate);
+    const entry = diaryEntries[key] || { title: '', rating: null, text: '' };
+
+    document.getElementById('entryDateLabel').textContent = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('titleInput').value = entry.title || '';
+    document.getElementById('logTextarea').value = entry.text || '';
+    renderRatingRow(entry.rating);
+    document.getElementById('saveNote').textContent = '';
+  }
+
+  async function handleSaveEntry() {
+    const key = dateKeyFromDate(selectedDate);
+    const title = document.getElementById('titleInput').value.trim();
+    const text = document.getElementById('logTextarea').value.trim();
+    const ratingRow = document.getElementById('ratingRow');
+    const rating = ratingRow.dataset.selected ? Number(ratingRow.dataset.selected) : null;
+
+    const entry = { title, rating, text };
+    saveDiaryEntryLocal(key, entry);
+    renderCalendar();
+    document.getElementById('saveNote').textContent = 'Saved';
+
+    if (currentUser) await pushDiaryToServer();
+  }
+
+  // ---- Pomodoro mini display ----
+
+  function renderPomodoroMini() {
+    const key = dateKeyFromDate(selectedDate);
+    const totals = pomodoroHistory[key] || {};
+    const list = document.getElementById('pomoMiniList');
+    const anyLogged = POMO_CATEGORIES.some(c => (totals[c.id] || 0) > 0);
+
+    if (!anyLogged) {
+      list.innerHTML = '<p class="pomo-mini-empty">No Pomodoro sessions logged this day</p>';
+      return;
+    }
+
+    list.innerHTML = POMO_CATEGORIES.map(c => `
+      <div class="pomo-mini-row">
+        <span class="pomo-mini-name">
+          <span class="pomo-dot" style="background:${c.color}"></span>
+          ${c.label}
+        </span>
+        <span class="pomo-mini-mins" style="color:${c.color}">${totals[c.id] || 0} min</span>
+      </div>
+    `).join('');
+  }
+
+  // ---- Auth UI ----
+
+  function renderAuthLoggedOut() {
+    const card = document.getElementById('authCard');
+    card.innerHTML = `
+      <div><p class="auth-status">Not logged in</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="auth-btn secondary" id="loginBtn">Log in</button>
+        <button class="auth-btn" id="signupBtn">Sign up</button>
+      </div>
+    `;
+    document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
+    document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+  }
+
+  function renderAuthLoggedIn(user) {
+    const card = document.getElementById('authCard');
+    card.innerHTML = `
+      <div>
+        <p class="auth-status">Logged in</p>
+        <p class="auth-email">${user.email}</p>
+      </div>
+      <button class="auth-btn secondary" id="logoutBtn">Log out</button>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
+  }
+
+  // ---- Nav dropdown ----
+
+  function initNav() {
+    const toggle = document.getElementById('navToggle');
+    const dropdown = document.getElementById('navDropdown');
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => dropdown.classList.remove('open'));
+  }
+
+  // ---- Month navigation ----
+
+  function initMonthNav() {
+    document.getElementById('prevMonthBtn').addEventListener('click', () => {
+      viewMonth--;
+      if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+      renderCalendar();
+    });
+    document.getElementById('nextMonthBtn').addEventListener('click', () => {
+      viewMonth++;
+      if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+      renderCalendar();
+    });
+  }
+
+  // ---- Init ----
+
+  function initApp() {
+    const now = new Date();
+    viewYear = now.getFullYear();
+    viewMonth = now.getMonth();
+    selectedDate = now;
+
+    loadDiaryLocal();
+    loadPomodoroLocal();
+    renderCalendar();
+    renderEntryPanel();
+    renderPomodoroMini();
+    initNav();
+    initMonthNav();
+
+    document.getElementById('saveEntryBtn').addEventListener('click', handleSaveEntry);
+  }
+
+  function initIdentity() {
+    if (typeof netlifyIdentity === 'undefined') {
+      document.getElementById('authCard').innerHTML =
+        '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      return;
+    }
+
+    netlifyIdentity.on('init', async user => {
+      currentUser = user || null;
+      if (user) {
+        renderAuthLoggedIn(user);
+        await pullDiaryFromServer();
+        await pullPomodoroFromServer();
+      } else {
+        renderAuthLoggedOut();
+      }
+      loadDiaryLocal();
+      loadPomodoroLocal();
+      renderCalendar();
+      renderEntryPanel();
+      renderPomodoroMini();
+      renderSyncNote();
+    });
+
+    netlifyIdentity.on('login', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      netlifyIdentity.close();
+      await pullDiaryFromServer();
+      await pullPomodoroFromServer();
+      loadDiaryLocal();
+      loadPomodoroLocal();
+      renderCalendar();
+      renderEntryPanel();
+      renderPomodoroMini();
+      await pushDiaryToServer();
+    });
+
+    netlifyIdentity.on('logout', () => {
+      currentUser = null;
+      renderAuthLoggedOut();
+      renderSyncNote();
+    });
+
+    netlifyIdentity.on('signup', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      await pushDiaryToServer();
+    });
+
+    netlifyIdentity.init();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    if (typeof netlifyIdentity !== 'undefined') {
+      initIdentity();
+    } else {
+      window.addEventListener('load', initIdentity);
+    }
+  });
+})();
+</script>
+</body>
+</html>
