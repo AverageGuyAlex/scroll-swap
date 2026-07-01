@@ -10,7 +10,11 @@ exports.handler = async (event, context) => {
     };
   }
 
-  const store = getStore('habit-data');
+  const store = getStore({
+    name: 'habit-data',
+    siteID: process.env.BLOBS_SITE_ID,
+    token: process.env.BLOBS_TOKEN,
+  });
   const userKey = `user-${user.sub}`;
 
   try {
