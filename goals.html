@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Goals &middot; Scroll Swap</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Goals">
+<meta name="theme-color" content="#1C1F1D">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Ccircle cx='90' cy='90' r='34' fill='none' stroke='%237A9B7E' stroke-width='8'/%3E%3Ccircle cx='90' cy='90' r='8' fill='%23C9A24B'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Ccircle cx='90' cy='90' r='34' fill='none' stroke='%237A9B7E' stroke-width='8'/%3E%3Ccircle cx='90' cy='90' r='8' fill='%23C9A24B'/%3E%3C/svg%3E">
+
+<script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; min-height: 100dvh; }
+  body {
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: max(28px, env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom);
+  }
+  :root {
+    --ink: #EDEAE2; --ink-dim: #A8A296; --bg: #1C1F1D; --card: #242824; --card-line: #34392F;
+    --gold: #C9A24B; --sage: #7A9B7E;
+  }
+  :root.theme-light {
+    --ink: #2A2A26; --ink-dim: #8A8478; --bg: #F3F1EA; --card: #FFFFFF; --card-line: #DDD8CB;
+    --gold: #A97F2E; --sage: #4F7A57;
+  }
+
+  #app {
+    font-family: Georgia, 'Iowan Old Style', serif; color: var(--ink); background: var(--bg);
+    padding: 8px 22px 40px; max-width: 480px; width: 100%; margin: 0 auto;
+  }
+
+  /* Nav */
+  .nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; position: relative; }
+  .nav-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--card); color: var(--ink); border: 1px solid var(--card-line); border-radius: 7px;
+    padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-dropdown {
+    position: absolute; top: 42px; left: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 190px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nav-dropdown.open { display: block; }
+  .nav-link {
+    display: block; padding: 12px 16px; font-family: 'Courier New', monospace; font-size: 12.5px;
+    color: var(--ink-dim); text-decoration: none; border-bottom: 1px solid var(--card-line);
+  }
+  .nav-link:last-child { border-bottom: none; }
+  .nav-link.active { color: var(--gold); }
+
+  .gear-btn {
+    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
+    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .gear-dropdown {
+    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
+  }
+  .gear-dropdown.open { display: block; }
+  .gear-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
+  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
+  .gear-settings-link {
+    display: block; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-line);
+    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
+  }
+
+  .header { margin-bottom: 18px; }
+  .eyebrow { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
+  .title { font-size: 26px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink-dim); margin: 0; }
+
+  .auth-card {
+    margin: 16px 0 20px; padding: 14px 16px; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .auth-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
+  .auth-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 2px 0 0; }
+  .auth-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--gold); color: var(--bg); border: none; border-radius: 6px; padding: 9px 14px;
+    cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  .auth-btn.secondary { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+
+  .add-goal-btn {
+    width: 100%; font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--card); color: var(--ink-dim); border: 1px dashed var(--card-line); border-radius: 10px;
+    padding: 14px; cursor: pointer; margin-bottom: 16px;
+  }
+  .inline-form {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 14px; margin-bottom: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .inline-input {
+    width: 100%; font-family: Georgia, serif; font-size: 15px; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--card-line); border-radius: 8px; padding: 10px 12px;
+  }
+  .inline-row { display: flex; gap: 8px; align-items: center; }
+  .inline-btn {
+    font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+    border: none; border-radius: 7px; padding: 9px 14px; cursor: pointer; font-weight: 600;
+  }
+  .inline-btn.confirm { background: var(--sage); color: var(--bg); flex: 1; }
+  .inline-btn.cancel { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+  .field-label { font-family: 'Courier New', monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); margin: 0 0 2px; }
+
+  /* Goal card */
+  .goal-card { background: var(--card); border: 1px solid var(--card-line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .goal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .goal-name { font-size: 19px; font-weight: 600; margin: 0; }
+  .goal-name.completed { color: var(--sage); text-decoration: line-through; }
+  .goal-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .icon-btn { background: transparent; border: none; color: var(--ink-dim); cursor: pointer; font-size: 15px; padding: 4px 6px; }
+
+  .goal-due-btn {
+    font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim);
+    border: 1px solid var(--card-line); border-radius: 6px; padding: 5px 9px; cursor: pointer; background: transparent;
+  }
+  .goal-due-btn.overdue { color: #E07A5F; border-color: #E07A5F; }
+  .due-date-editor {
+    background: var(--bg); border: 1px solid var(--card-line); border-radius: 10px; padding: 12px;
+    margin: 10px 0; display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .progress-track {
+    width: 100%; height: 10px; border-radius: 6px; background: var(--bg); overflow: hidden; margin: 12px 0 6px;
+    border: 1px solid var(--card-line);
+  }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--sage), var(--gold)); border-radius: 6px; transition: width 0.3s ease; }
+  .progress-fill.overdue { background: #E07A5F; }
+  .progress-label { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 14px; }
+
+  .complete-toggle-btn {
+    width: 100%; font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    border-radius: 7px; padding: 10px; cursor: pointer; font-weight: 600; margin-bottom: 14px; border: 1px solid var(--card-line);
+    background: transparent; color: var(--ink-dim);
+  }
+  .complete-toggle-btn.is-complete { background: var(--sage); color: var(--bg); border-color: var(--sage); }
+
+  .goal-section-title {
+    font-family: 'Courier New', monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-dim); margin: 16px 0 8px;
+  }
+
+  /* Milestones */
+  .milestone-row { display: flex; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--card-line); }
+  .milestone-row:last-child { border-bottom: none; }
+  .milestone-box {
+    width: 19px; height: 19px; border-radius: 5px; border: 1.5px solid var(--ink-dim); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .milestone-box.checked { background: var(--sage); border-color: var(--sage); }
+  .milestone-box svg { opacity: 0; }
+  .milestone-box.checked svg { opacity: 1; }
+  .milestone-text { flex: 1; font-size: 14.5px; cursor: pointer; }
+  .milestone-text.checked { color: var(--ink-dim); text-decoration: line-through; }
+  .milestone-date { font-family: 'Courier New', monospace; font-size: 10px; color: var(--ink-dim); flex-shrink: 0; }
+
+  /* Hours log */
+  .hours-total-row {
+    display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px;
+  }
+  .hours-total-num { font-size: 24px; font-weight: 700; color: var(--gold); font-family: Georgia, serif; }
+  .hours-total-label { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); text-transform: uppercase; }
+  .hours-form { display: flex; gap: 8px; margin-bottom: 10px; }
+  .hours-date-input, .hours-num-input {
+    font-family: 'Courier New', monospace; font-size: 13px; background: var(--bg); color: var(--ink);
+    border: 1px solid var(--card-line); border-radius: 7px; padding: 8px;
+  }
+  .hours-date-input { flex: 1.3; }
+  .hours-num-input { flex: 1; }
+  .hours-save-btn {
+    background: var(--sage); color: var(--bg); border: none; border-radius: 7px; padding: 8px 14px;
+    font-family: 'Courier New', monospace; font-size: 11.5px; text-transform: uppercase; cursor: pointer; font-weight: 600;
+  }
+  .hours-entry-row {
+    display: flex; justify-content: space-between; align-items: center; padding: 6px 2px;
+    font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink-dim); cursor: pointer;
+    border-bottom: 1px solid var(--card-line);
+  }
+  .hours-entry-row:last-child { border-bottom: none; }
+  .hours-entry-row:hover { color: var(--ink); }
+
+  .empty-note { font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink-dim); text-align: center; padding: 20px 0; }
+  .sync-note { margin-top: 16px; font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim); text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="nav-row">
+    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="dashboard.html" class="nav-link">Dashboard</a>
+      <a href="goals.html" class="nav-link active">Goals</a>
+      <a href="lock-in.html" class="nav-link">Lock In</a>
+      <a href="pomodoro.html" class="nav-link">Pomodoro</a>
+      <a href="diary.html" class="nav-link">Diary</a>
+      <a href="todo.html" class="nav-link">To-Do</a>
+      <a href="settings.html" class="nav-link">Settings</a>
+    </div>
+    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <div class="gear-dropdown" id="gearDropdown">
+      <div id="gearAccountSection"></div>
+      <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
+    </div>
+  </div>
+
+  <div class="header">
+    <p class="eyebrow">Long-term</p>
+    <h1 class="title">Goals</h1>
+    <p class="subtitle">Set a deadline, track milestones, log your hours.</p>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <p class="auth-status">Checking login&hellip;</p>
+  </div>
+
+  <div id="addGoalArea"></div>
+  <div id="goalsList"></div>
+
+  <p class="sync-note" id="syncNote"></p>
+</div>
+
+<script>
+(function() {
+  const STATE_KEY = 'scrollswap_goals_state';
+  const FUNCTION_URL = '/.netlify/functions/goals';
+
+  let currentUser = null;
+  let syncing = false;
+  let state = { goals: [] };
+  let addingGoal = false;
+  let editingDueDateFor = null; // goal id
+  let addingMilestoneFor = null; // goal id
+  let hoursFormDraft = {}; // goalId -> { date, hours } currently in the input fields
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  // ---- Storage ----
+
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      state = raw ? JSON.parse(raw) : { goals: [] };
+      if (!state.goals) state.goals = [];
+    } catch (e) { state = { goals: [] }; }
+  }
+
+  function saveLocal() {
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
+    catch (e) { console.error('Save failed', e); }
+  }
+
+  async function pullFromServer() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const serverState = await res.json();
+      if (serverState && serverState.goals) {
+        state = { goals: serverState.goals };
+        saveLocal();
+      }
+    } catch (e) { console.error('Pull failed', e); }
+  }
+
+  async function pushToServer() {
+    if (!currentUser) return;
+    syncing = true;
+    renderSyncNote();
+    try {
+      const token = await currentUser.jwt();
+      await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(state),
+      });
+    } catch (e) {
+      console.error('Push failed', e);
+    } finally {
+      syncing = false;
+      renderSyncNote();
+    }
+  }
+
+  function renderSyncNote() {
+    const el = document.getElementById('syncNote');
+    if (!el) return;
+    if (!currentUser) el.textContent = 'Not synced \u2014 log in to save across devices';
+    else if (syncing) el.textContent = 'Syncing\u2026';
+    else el.textContent = 'Synced to your account';
+  }
+
+  async function persist() {
+    saveLocal();
+    if (currentUser) await pushToServer();
+  }
+
+  // ---- Mutations ----
+
+  async function addGoal(name, dueDate) {
+    state.goals.push({
+      id: uid(), name, dueDate: dueDate || null, createdDate: todayKey(),
+      completed: false, milestones: [], dailyHours: {},
+    });
+    await persist();
+  }
+
+  async function deleteGoal(goalId) {
+    if (!confirm('Delete this goal and all its progress?')) return;
+    state.goals = state.goals.filter(g => g.id !== goalId);
+    await persist();
+    renderGoals();
+  }
+
+  async function updateGoalDueDate(goalId, dueDate) {
+    const goal = state.goals.find(g => g.id === goalId);
+    if (goal) goal.dueDate = dueDate || null;
+    await persist();
+  }
+
+  async function toggleGoalCompleted(goalId) {
+    const goal = state.goals.find(g => g.id === goalId);
+    if (goal) goal.completed = !goal.completed;
+    await persist();
+    renderGoals();
+  }
+
+  async function addMilestone(goalId, text) {
+    const goal = state.goals.find(g => g.id === goalId);
+    if (goal) goal.milestones.push({ id: uid(), text, done: false, completedDate: null });
+    await persist();
+  }
+
+  async function toggleMilestone(goalId, milestoneId) {
+    const goal = state.goals.find(g => g.id === goalId);
+    const m = goal && goal.milestones.find(x => x.id === milestoneId);
+    if (m) {
+      m.done = !m.done;
+      m.completedDate = m.done ? todayKey() : null;
+    }
+    await persist();
+    renderGoals();
+  }
+
+  async function deleteMilestone(goalId, milestoneId) {
+    const goal = state.goals.find(g => g.id === goalId);
+    if (goal) goal.milestones = goal.milestones.filter(m => m.id !== milestoneId);
+    await persist();
+    renderGoals();
+  }
+
+  async function setHoursForDate(goalId, date, hours) {
+    const goal = state.goals.find(g => g.id === goalId);
+    if (!goal) return;
+    const num = parseFloat(hours);
+    if (!date || isNaN(num) || num < 0) return;
+    if (num === 0) delete goal.dailyHours[date];
+    else goal.dailyHours[date] = num;
+    await persist();
+    renderGoals();
+  }
+
+  // ---- Calculations ----
+
+  function goalProgressPercent(goal) {
+    if (!goal.dueDate) return null;
+    const created = new Date(goal.createdDate + 'T00:00:00');
+    const due = new Date(goal.dueDate + 'T00:00:00');
+    const today = new Date(todayKey() + 'T00:00:00');
+    if (due <= created) return today >= due ? 100 : 0;
+    const pct = ((today - created) / (due - created)) * 100;
+    return Math.max(0, Math.min(100, pct));
+  }
+
+  function goalIsOverdue(goal) {
+    return goal.dueDate && !goal.completed && goal.dueDate < todayKey();
+  }
+
+  function goalDaysLabel(goal) {
+    if (!goal.dueDate) return '';
+    const due = new Date(goal.dueDate + 'T00:00:00');
+    const today = new Date(todayKey() + 'T00:00:00');
+    const diffDays = Math.round((due - today) / 86400000);
+    if (diffDays > 0) return `${diffDays} day${diffDays === 1 ? '' : 's'} left`;
+    if (diffDays === 0) return 'Due today';
+    return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} overdue`;
+  }
+
+  function totalHoursForGoal(goal) {
+    return Object.values(goal.dailyHours).reduce((sum, h) => sum + h, 0);
+  }
+
+  function checkmarkSVG() {
+    return '<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#1C1F1D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  // ---- Rendering ----
+
+  function renderAddGoalArea() {
+    const area = document.getElementById('addGoalArea');
+    if (!addingGoal) {
+      area.innerHTML = `<button class="add-goal-btn" id="showAddGoalBtn">+ Add goal</button>`;
+      document.getElementById('showAddGoalBtn').addEventListener('click', () => {
+        addingGoal = true;
+        renderAddGoalArea();
+      });
+      return;
+    }
+    area.innerHTML = `
+      <div class="inline-form">
+        <p class="field-label">Goal name</p>
+        <input type="text" class="inline-input" id="newGoalName" placeholder="e.g. Run a half marathon">
+        <p class="field-label">Due date</p>
+        <input type="date" class="inline-input" id="newGoalDueDate">
+        <div class="inline-row">
+          <button class="inline-btn cancel" id="cancelGoalBtn">Cancel</button>
+          <button class="inline-btn confirm" id="confirmGoalBtn">Add</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('cancelGoalBtn').addEventListener('click', () => {
+      addingGoal = false;
+      renderAddGoalArea();
+    });
+    document.getElementById('confirmGoalBtn').addEventListener('click', async () => {
+      const name = document.getElementById('newGoalName').value.trim();
+      const dueDate = document.getElementById('newGoalDueDate').value;
+      if (!name) return;
+      await addGoal(name, dueDate);
+      addingGoal = false;
+      renderAddGoalArea();
+      renderGoals();
+    });
+  }
+
+  function renderGoals() {
+    const list = document.getElementById('goalsList');
+    if (state.goals.length === 0) {
+      list.innerHTML = '<p class="empty-note">No goals yet. Add one to start tracking.</p>';
+      return;
+    }
+    list.innerHTML = state.goals.map(g => renderGoalCard(g)).join('');
+    attachGoalListeners();
+  }
+
+  function renderGoalCard(goal) {
+    const pct = goalProgressPercent(goal);
+    const overdue = goalIsOverdue(goal);
+    const totalHours = totalHoursForGoal(goal);
+    const sortedHours = Object.keys(goal.dailyHours).sort().reverse();
+    const draft = hoursFormDraft[goal.id] || { date: todayKey(), hours: '' };
+
+    return `
+      <div class="goal-card" data-goal-id="${goal.id}">
+        <div class="goal-header">
+          <p class="goal-name ${goal.completed ? 'completed' : ''}">${goal.name}</p>
+          <div class="goal-actions">
+            <button class="icon-btn delete-goal-btn" data-goal-id="${goal.id}">&times;</button>
+          </div>
+        </div>
+
+        <button class="goal-due-btn ${overdue ? 'overdue' : ''}" data-goal-id="${goal.id}">
+          ${goal.dueDate ? `Due ${formatShortDate(goal.dueDate)}` : 'Set due date'}
+        </button>
+
+        ${editingDueDateFor === goal.id ? `
+          <div class="due-date-editor">
+            <input type="date" class="inline-input goal-due-date-input" data-goal-id="${goal.id}" value="${goal.dueDate || ''}">
+            <div class="inline-row">
+              <button class="inline-btn cancel clear-goal-due-btn" data-goal-id="${goal.id}">Clear</button>
+              <button class="inline-btn cancel cancel-goal-due-btn" data-goal-id="${goal.id}">Cancel</button>
+              <button class="inline-btn confirm save-goal-due-btn" data-goal-id="${goal.id}">Save</button>
+            </div>
+          </div>
+        ` : ''}
+
+        ${pct !== null ? `
+          <div class="progress-track"><div class="progress-fill ${overdue ? 'overdue' : ''}" style="width:${pct}%;"></div></div>
+          <p class="progress-label">${Math.round(pct)}% of the way to the deadline &middot; ${goalDaysLabel(goal)}</p>
+        ` : ''}
+
+        <button class="complete-toggle-btn ${goal.completed ? 'is-complete' : ''}" data-goal-id="${goal.id}">
+          ${goal.completed ? '&#10003; Completed' : 'Mark as complete'}
+        </button>
+
+        <p class="goal-section-title">Milestones</p>
+        ${goal.milestones.map(m => `
+          <div class="milestone-row">
+            <div class="milestone-box ${m.done ? 'checked' : ''}" data-goal-id="${goal.id}" data-milestone-id="${m.id}">${checkmarkSVG()}</div>
+            <span class="milestone-text ${m.done ? 'checked' : ''}" data-goal-id="${goal.id}" data-milestone-id="${m.id}">${m.text}</span>
+            ${m.done && m.completedDate ? `<span class="milestone-date">${formatShortDate(m.completedDate)}</span>` : ''}
+            <button class="icon-btn delete-milestone-btn" data-goal-id="${goal.id}" data-milestone-id="${m.id}">&times;</button>
+          </div>
+        `).join('')}
+        ${addingMilestoneFor === goal.id ? `
+          <div class="inline-form" style="margin-top:8px;">
+            <input type="text" class="inline-input new-milestone-text" data-goal-id="${goal.id}" placeholder="Milestone (e.g. Run 10k without stopping)">
+            <div class="inline-row">
+              <button class="inline-btn cancel cancel-milestone-btn" data-goal-id="${goal.id}">Cancel</button>
+              <button class="inline-btn confirm confirm-milestone-btn" data-goal-id="${goal.id}">Add</button>
+            </div>
+          </div>
+        ` : `<button class="add-row-btn add-milestone-trigger" data-goal-id="${goal.id}" style="background:none;border:none;color:var(--ink-dim);font-family:'Courier New',monospace;font-size:11.5px;text-decoration:underline;cursor:pointer;padding:8px 4px;">+ Add milestone</button>`}
+
+        <p class="goal-section-title">Hours worked</p>
+        <div class="hours-total-row">
+          <span class="hours-total-num">${totalHours}</span>
+          <span class="hours-total-label">total hours logged</span>
+        </div>
+        <div class="hours-form">
+          <input type="date" class="hours-date-input" data-goal-id="${goal.id}" id="hours-date-${goal.id}" value="${draft.date}">
+          <input type="number" step="0.25" min="0" class="hours-num-input" data-goal-id="${goal.id}" id="hours-num-${goal.id}" placeholder="Hours" value="${draft.hours}">
+          <button class="hours-save-btn save-hours-btn" data-goal-id="${goal.id}">Save</button>
+        </div>
+        ${sortedHours.length > 0 ? sortedHours.map(date => `
+          <div class="hours-entry-row edit-hours-entry" data-goal-id="${goal.id}" data-date="${date}" data-hours="${goal.dailyHours[date]}">
+            <span>${formatShortDate(date)}</span>
+            <span>${goal.dailyHours[date]}h</span>
+          </div>
+        `).join('') : '<p class="empty-note" style="padding:8px 0;">No hours logged yet</p>'}
+      </div>
+    `;
+  }
+
+  function attachGoalListeners() {
+    document.querySelectorAll('.delete-goal-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteGoal(btn.dataset.goalId));
+    });
+
+    document.querySelectorAll('.goal-due-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editingDueDateFor = editingDueDateFor === btn.dataset.goalId ? null : btn.dataset.goalId;
+        renderGoals();
+      });
+    });
+    document.querySelectorAll('.cancel-goal-due-btn').forEach(btn => {
+      btn.addEventListener('click', () => { editingDueDateFor = null; renderGoals(); });
+    });
+    document.querySelectorAll('.clear-goal-due-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await updateGoalDueDate(btn.dataset.goalId, '');
+        editingDueDateFor = null;
+        renderGoals();
+      });
+    });
+    document.querySelectorAll('.save-goal-due-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const input = document.querySelector(`.goal-due-date-input[data-goal-id="${btn.dataset.goalId}"]`);
+        await updateGoalDueDate(btn.dataset.goalId, input.value);
+        editingDueDateFor = null;
+        renderGoals();
+      });
+    });
+
+    document.querySelectorAll('.complete-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => toggleGoalCompleted(btn.dataset.goalId));
+    });
+
+    document.querySelectorAll('.milestone-box, .milestone-text').forEach(el => {
+      el.addEventListener('click', () => toggleMilestone(el.dataset.goalId, el.dataset.milestoneId));
+    });
+    document.querySelectorAll('.delete-milestone-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteMilestone(btn.dataset.goalId, btn.dataset.milestoneId));
+    });
+
+    document.querySelectorAll('.add-milestone-trigger').forEach(btn => {
+      btn.addEventListener('click', () => { addingMilestoneFor = btn.dataset.goalId; renderGoals(); });
+    });
+    document.querySelectorAll('.cancel-milestone-btn').forEach(btn => {
+      btn.addEventListener('click', () => { addingMilestoneFor = null; renderGoals(); });
+    });
+    document.querySelectorAll('.confirm-milestone-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const input = document.querySelector(`.new-milestone-text[data-goal-id="${btn.dataset.goalId}"]`);
+        const text = input.value.trim();
+        if (!text) return;
+        await addMilestone(btn.dataset.goalId, text);
+        addingMilestoneFor = null;
+        renderGoals();
+      });
+    });
+
+    document.querySelectorAll('.save-hours-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const goalId = btn.dataset.goalId;
+        const dateInput = document.getElementById(`hours-date-${goalId}`);
+        const hoursInput = document.getElementById(`hours-num-${goalId}`);
+        await setHoursForDate(goalId, dateInput.value, hoursInput.value);
+        hoursFormDraft[goalId] = { date: todayKey(), hours: '' };
+      });
+    });
+
+    document.querySelectorAll('.hours-date-input, .hours-num-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const goalId = input.dataset.goalId;
+        if (!hoursFormDraft[goalId]) hoursFormDraft[goalId] = { date: todayKey(), hours: '' };
+        const dateInput = document.getElementById(`hours-date-${goalId}`);
+        const hoursInput = document.getElementById(`hours-num-${goalId}`);
+        hoursFormDraft[goalId] = { date: dateInput.value, hours: hoursInput.value };
+      });
+    });
+
+    document.querySelectorAll('.edit-hours-entry').forEach(row => {
+      row.addEventListener('click', () => {
+        const goalId = row.dataset.goalId;
+        hoursFormDraft[goalId] = { date: row.dataset.date, hours: row.dataset.hours };
+        renderGoals();
+      });
+    });
+  }
+
+  // ---- Auth UI ----
+
+  function renderAuthLoggedOut() {
+    const card = document.getElementById('authCard');
+    card.style.display = 'flex';
+    card.innerHTML = `
+      <div><p class="auth-status">Not logged in</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="auth-btn secondary" id="loginBtn">Log in</button>
+        <button class="auth-btn" id="signupBtn">Sign up</button>
+      </div>
+    `;
+    document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
+    document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `<p class="gear-status">Not logged in</p><p class="gear-note">Log in to see account options here.</p>`;
+  }
+
+  function renderAuthLoggedIn(user) {
+    const card = document.getElementById('authCard');
+    card.style.display = 'none';
+    card.innerHTML = '';
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `
+      <p class="gear-status">Logged in</p>
+      <p class="gear-email">${user.email}</p>
+      <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
+  }
+
+  // ---- Theme ----
+
+  function applyTheme(theme) {
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+  }
+
+  function initTheme() {
+    let saved = 'dark';
+    try { saved = localStorage.getItem('scrollswap_theme') || 'dark'; } catch (e) {}
+    applyTheme(saved);
+  }
+
+  // ---- Nav dropdown ----
+
+  function initNav() {
+    const toggle = document.getElementById('navToggle');
+    const dropdown = document.getElementById('navDropdown');
+    const gearToggle = document.getElementById('gearToggle');
+    const gearDropdown = document.getElementById('gearDropdown');
+    toggle.addEventListener('click', (e) => { e.stopPropagation(); gearDropdown.classList.remove('open'); dropdown.classList.toggle('open'); });
+    gearToggle.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.remove('open'); gearDropdown.classList.toggle('open'); });
+    document.addEventListener('click', () => { dropdown.classList.remove('open'); gearDropdown.classList.remove('open'); });
+  }
+
+  // ---- Init ----
+
+  function initApp() {
+    initTheme();
+    loadLocal();
+    renderAddGoalArea();
+    renderGoals();
+    initNav();
+  }
+
+  function initIdentity() {
+    if (typeof netlifyIdentity === 'undefined') {
+      document.getElementById('authCard').innerHTML = '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      return;
+    }
+    netlifyIdentity.on('init', async user => {
+      currentUser = user || null;
+      if (user) { renderAuthLoggedIn(user); await pullFromServer(); }
+      else { renderAuthLoggedOut(); }
+      loadLocal();
+      renderGoals();
+      renderSyncNote();
+    });
+    netlifyIdentity.on('login', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      netlifyIdentity.close();
+      await pullFromServer();
+      loadLocal();
+      renderGoals();
+      await pushToServer();
+    });
+    netlifyIdentity.on('logout', () => { currentUser = null; renderAuthLoggedOut(); renderSyncNote(); });
+    netlifyIdentity.on('signup', async user => { currentUser = user; renderAuthLoggedIn(user); await pushToServer(); });
+    netlifyIdentity.init();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    if (typeof netlifyIdentity !== 'undefined') { initIdentity(); }
+    else { window.addEventListener('load', initIdentity); }
+  });
+})();
+</script>
+</body>
+</html>

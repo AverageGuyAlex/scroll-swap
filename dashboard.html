@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Dashboard &middot; Scroll Swap</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#1C1F1D">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Crect x='45' y='45' width='40' height='40' rx='6' fill='%237A9B7E'/%3E%3Crect x='95' y='45' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='45' y='95' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='95' y='95' width='40' height='40' rx='6' fill='%23C9A24B'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='45' y='45' width='40' height='40' rx='6' fill='%237A9B7E'/%3E%3Crect x='95' y='45' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='45' y='95' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='95' y='95' width='40' height='40' rx='6' fill='%23C9A24B'/%3E%3C/svg%3E">
+
+<script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; min-height: 100dvh; }
+  body {
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: max(28px, env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom);
+  }
+  :root {
+    --ink: #EDEAE2; --ink-dim: #A8A296; --bg: #1C1F1D; --card: #242824; --card-line: #34392F;
+    --gold: #C9A24B; --sage: #7A9B7E;
+    --cat-productivity: #6FA37A; --cat-workout: #C1503F; --cat-reading: #D9B54A;
+  }
+  :root.theme-light {
+    --ink: #2A2A26; --ink-dim: #8A8478; --bg: #F3F1EA; --card: #FFFFFF; --card-line: #DDD8CB;
+    --gold: #A97F2E; --sage: #4F7A57;
+    --cat-productivity: #4F7A57; --cat-workout: #A8402F; --cat-reading: #A98A2E;
+  }
+
+  #app {
+    font-family: Georgia, 'Iowan Old Style', serif; color: var(--ink); background: var(--bg);
+    padding: 8px 22px 40px; max-width: 480px; width: 100%; margin: 0 auto;
+  }
+
+  /* Nav */
+  .nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; position: relative; }
+  .nav-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--card); color: var(--ink); border: 1px solid var(--card-line); border-radius: 7px;
+    padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-dropdown {
+    position: absolute; top: 42px; left: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 190px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nav-dropdown.open { display: block; }
+  .nav-link {
+    display: block; padding: 12px 16px; font-family: 'Courier New', monospace; font-size: 12.5px;
+    color: var(--ink-dim); text-decoration: none; border-bottom: 1px solid var(--card-line);
+  }
+  .nav-link:last-child { border-bottom: none; }
+  .nav-link.active { color: var(--gold); }
+
+  .gear-btn {
+    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
+    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .gear-dropdown {
+    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
+  }
+  .gear-dropdown.open { display: block; }
+  .gear-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
+  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
+  .gear-settings-link {
+    display: block; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-line);
+    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
+  }
+
+  .header { margin-bottom: 18px; }
+  .eyebrow { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
+  .title { font-size: 26px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink-dim); margin: 0; }
+
+  .auth-card {
+    margin: 16px 0 20px; padding: 14px 16px; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .auth-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
+  .auth-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 2px 0 0; }
+  .auth-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--gold); color: var(--bg); border: none; border-radius: 6px; padding: 9px 14px;
+    cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  .auth-btn.secondary { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+
+  /* Quote */
+  .quote-card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 14px; padding: 22px 20px;
+    margin-bottom: 18px; text-align: center;
+  }
+  .quote-text { font-size: 18px; font-style: italic; line-height: 1.5; margin: 0; color: var(--ink); }
+  .quote-label {
+    font-family: 'Courier New', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--gold); margin: 0 0 10px;
+  }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 16px 14px; text-align: center;
+  }
+  .stat-num { font-size: 26px; font-weight: 700; color: var(--gold); font-family: Georgia, serif; line-height: 1; margin-bottom: 6px; }
+  .stat-label { font-family: 'Courier New', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); line-height: 1.4; }
+
+  /* Chart section */
+  .chart-section-title {
+    font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-dim); margin: 0 0 10px;
+  }
+  .range-toggle-row { display: flex; gap: 6px; margin-bottom: 18px; }
+  .range-btn {
+    flex: 1; font-family: 'Courier New', monospace; font-size: 10.5px; letter-spacing: 0.03em; text-transform: uppercase;
+    background: var(--card); color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 7px;
+    padding: 8px 6px; cursor: pointer;
+  }
+  .range-btn.selected { background: var(--gold); color: var(--bg); border-color: var(--gold); font-weight: 600; }
+  .chart-card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 14px; padding: 20px;
+    display: flex; flex-direction: column; align-items: center; margin-bottom: 18px;
+  }
+  .pie { width: 150px; height: 150px; border-radius: 50%; margin-bottom: 16px; }
+  .pie.empty { background: var(--card-line) !important; }
+  .chart-legend { width: 100%; }
+  .legend-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px; font-family: 'Courier New', monospace; font-size: 12px; }
+  .legend-name { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+  .legend-pct { color: var(--ink-dim); }
+  .cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .chart-empty-note { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); text-align: center; }
+
+  .sync-note { margin-top: 16px; font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim); text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="nav-row">
+    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="dashboard.html" class="nav-link active">Dashboard</a>
+      <a href="goals.html" class="nav-link">Goals</a>
+      <a href="lock-in.html" class="nav-link">Lock In</a>
+      <a href="pomodoro.html" class="nav-link">Pomodoro</a>
+      <a href="diary.html" class="nav-link">Diary</a>
+      <a href="todo.html" class="nav-link">To-Do</a>
+      <a href="settings.html" class="nav-link">Settings</a>
+    </div>
+    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <div class="gear-dropdown" id="gearDropdown">
+      <div id="gearAccountSection"></div>
+      <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
+    </div>
+  </div>
+
+  <div class="header">
+    <p class="eyebrow">Overview</p>
+    <h1 class="title">Dashboard</h1>
+    <p class="subtitle">Where things stand today.</p>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <p class="auth-status">Checking login&hellip;</p>
+  </div>
+
+  <div class="quote-card">
+    <p class="quote-label">Today's note</p>
+    <p class="quote-text" id="quoteText"></p>
+  </div>
+
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <p class="chart-section-title">Pomodoro balance</p>
+  <div class="range-toggle-row" id="rangeToggleRow">
+    <button class="range-btn selected" data-range="1">Today</button>
+    <button class="range-btn" data-range="7">Last 7 days</button>
+    <button class="range-btn" data-range="30">Last 30 days</button>
+  </div>
+  <div class="chart-card">
+    <div class="pie" id="pieCircle"></div>
+    <div class="chart-legend" id="chartLegend"></div>
+  </div>
+
+  <p class="sync-note" id="syncNote"></p>
+</div>
+
+<script>
+(function() {
+  const POMODORO_PREFIX = 'pomodoro_';
+  const TODO_STATE_KEY = 'scrollswap_todo_state';
+  const GOALS_STATE_KEY = 'scrollswap_goals_state';
+  const POMODORO_FUNCTION_URL = '/.netlify/functions/pomodoro';
+  const TODOS_FUNCTION_URL = '/.netlify/functions/todos';
+  const GOALS_FUNCTION_URL = '/.netlify/functions/goals';
+
+  const CATEGORIES = [
+    { id: 'productivity', label: 'Productivity', color: 'var(--cat-productivity)' },
+    { id: 'workout', label: 'Working Out', color: 'var(--cat-workout)' },
+    { id: 'reading', label: 'Reading', color: 'var(--cat-reading)' },
+  ];
+
+  const QUOTES = [
+    'Small, consistent steps beat occasional bursts of effort.',
+    'Discipline is choosing what you want most over what you want now.',
+    'You do not need to feel motivated to begin \u2014 begin, and motivation follows.',
+    'Progress hides inside boring, repeated days.',
+    'The work you avoid the most is often the work that matters the most.',
+    'Done today is worth more than perfect someday.',
+    'A slow start is still a start.',
+    'You are building a version of yourself that future-you will thank you for.',
+    'Focus is a muscle. Every distraction resisted makes it stronger.',
+    'The comeback is always more interesting than the setback.',
+    'What gets logged gets improved.',
+    'Rest is part of the work, not a break from it.',
+    'One honest hour beats three distracted ones.',
+    'Today only asks for today\u2019s effort, not the whole mountain.',
+    'The habit is the goal. The result is just proof.',
+    'Nobody sees the quiet repetition behind a result they admire.',
+    'You do not have to feel ready. You just have to start moving.',
+    'Consistency turns ordinary effort into extraordinary results.',
+    'Every check mark today is a vote for who you are becoming.',
+    'Momentum is built, not found.',
+  ];
+
+  let currentUser = null;
+  let syncing = false;
+  let chartRange = 1;
+
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function dayOfYear() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const diff = now - start;
+    return Math.floor(diff / 86400000);
+  }
+
+  function renderQuote() {
+    const quote = QUOTES[dayOfYear() % QUOTES.length];
+    document.getElementById('quoteText').textContent = quote;
+  }
+
+  // ---- Pomodoro data (read-only here) ----
+
+  function dateKeyFromDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function getPomodoroRangeTotals(days) {
+    const totals = {};
+    const cursor = new Date();
+    for (let i = 0; i < days; i++) {
+      const key = POMODORO_PREFIX + dateKeyFromDate(cursor);
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const dayTotals = JSON.parse(raw);
+          Object.keys(dayTotals).forEach(catId => {
+            totals[catId] = (totals[catId] || 0) + (dayTotals[catId] || 0);
+          });
+        }
+      } catch (e) {}
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return totals;
+  }
+
+  function getPomodoroAllTimeMinutes() {
+    let total = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(POMODORO_PREFIX)) {
+        try {
+          const dayTotals = JSON.parse(localStorage.getItem(key));
+          Object.values(dayTotals).forEach(m => { total += (m || 0); });
+        } catch (e) {}
+      }
+    }
+    return total;
+  }
+
+  async function pullPomodoroReadOnly() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(POMODORO_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const serverHistory = await res.json();
+      Object.keys(serverHistory || {}).forEach(date => {
+        localStorage.setItem(POMODORO_PREFIX + date, JSON.stringify(serverHistory[date]));
+      });
+    } catch (e) { console.error('Pomodoro pull failed', e); }
+  }
+
+  // ---- To-Do data (read-only here) ----
+
+  function getTodoStats() {
+    let totalCompleted = 0;
+    try {
+      const raw = localStorage.getItem(TODO_STATE_KEY);
+      if (raw) {
+        const state = JSON.parse(raw);
+        (state.categories || []).forEach(cat => {
+          (cat.subcategories || []).forEach(sc => {
+            (sc.tasks || []).forEach(t => {
+              if (!t.recurring && t.done) totalCompleted++;
+            });
+          });
+        });
+        Object.values(state.completions || {}).forEach(dayMap => {
+          totalCompleted += Object.values(dayMap).filter(Boolean).length;
+        });
+      }
+    } catch (e) {}
+    return { totalCompleted };
+  }
+
+  async function pullTodosReadOnly() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(TODOS_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const serverState = await res.json();
+      if (serverState) localStorage.setItem(TODO_STATE_KEY, JSON.stringify(serverState));
+    } catch (e) { console.error('Todos pull failed', e); }
+  }
+
+  // ---- Goals data (read-only here) ----
+
+  function getGoalsStats() {
+    let totalHours = 0;
+    let completedGoals = 0;
+    try {
+      const raw = localStorage.getItem(GOALS_STATE_KEY);
+      if (raw) {
+        const state = JSON.parse(raw);
+        (state.goals || []).forEach(g => {
+          totalHours += Object.values(g.dailyHours || {}).reduce((sum, h) => sum + h, 0);
+          if (g.completed) completedGoals++;
+        });
+      }
+    } catch (e) {}
+    return { totalHours, completedGoals };
+  }
+
+  async function pullGoalsReadOnly() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(GOALS_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const serverState = await res.json();
+      if (serverState) localStorage.setItem(GOALS_STATE_KEY, JSON.stringify(serverState));
+    } catch (e) { console.error('Goals pull failed', e); }
+  }
+
+  // ---- Stats rendering ----
+
+  function renderStats() {
+    const todoStats = getTodoStats();
+    const pomodoroMinutes = getPomodoroAllTimeMinutes();
+    const goalsStats = getGoalsStats();
+
+    const grid = document.getElementById('statsGrid');
+    grid.innerHTML = `
+      <div class="stat-card">
+        <p class="stat-num">${todoStats.totalCompleted}</p>
+        <p class="stat-label">Tasks completed</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-num">${pomodoroMinutes}</p>
+        <p class="stat-label">Pomodoro minutes</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-num">${goalsStats.totalHours}</p>
+        <p class="stat-label">Hours on goals</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-num">${goalsStats.completedGoals}</p>
+        <p class="stat-label">Goals completed</p>
+      </div>
+    `;
+  }
+
+  // ---- Pie chart ----
+
+  function rangeLabel(days) {
+    if (days === 1) return 'today';
+    return `the last ${days} days`;
+  }
+
+  function renderChart() {
+    const pie = document.getElementById('pieCircle');
+    const legend = document.getElementById('chartLegend');
+    const rangeTotals = getPomodoroRangeTotals(chartRange);
+    const total = CATEGORIES.reduce((sum, c) => sum + (rangeTotals[c.id] || 0), 0);
+
+    if (total === 0) {
+      pie.classList.add('empty');
+      pie.style.background = '';
+      legend.innerHTML = `<p class="chart-empty-note">No sessions logged for ${rangeLabel(chartRange)}</p>`;
+      return;
+    }
+
+    pie.classList.remove('empty');
+    let cursor = 0;
+    const segments = CATEGORIES.map(c => {
+      const minutes = rangeTotals[c.id] || 0;
+      const pct = (minutes / total) * 100;
+      const start = cursor;
+      const end = cursor + pct;
+      cursor = end;
+      return { color: c.color, start, end, pct, label: c.label };
+    });
+
+    const gradientParts = segments.filter(s => s.pct > 0).map(s => `${s.color} ${s.start}% ${s.end}%`).join(', ');
+    pie.style.background = `conic-gradient(${gradientParts})`;
+
+    legend.innerHTML = segments.map(s => `
+      <div class="legend-row">
+        <span class="legend-name"><span class="cat-dot" style="background:${s.color}"></span>${s.label}</span>
+        <span class="legend-pct">${Math.round(s.pct)}%</span>
+      </div>
+    `).join('');
+  }
+
+  function initChartToggle() {
+    document.querySelectorAll('.range-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        chartRange = parseInt(btn.dataset.range, 10);
+        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        renderChart();
+      });
+    });
+  }
+
+  // ---- Auth UI ----
+
+  function renderAuthLoggedOut() {
+    const card = document.getElementById('authCard');
+    card.style.display = 'flex';
+    card.innerHTML = `
+      <div><p class="auth-status">Not logged in</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="auth-btn secondary" id="loginBtn">Log in</button>
+        <button class="auth-btn" id="signupBtn">Sign up</button>
+      </div>
+    `;
+    document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
+    document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `<p class="gear-status">Not logged in</p><p class="gear-note">Log in to see account options here.</p>`;
+  }
+
+  function renderAuthLoggedIn(user) {
+    const card = document.getElementById('authCard');
+    card.style.display = 'none';
+    card.innerHTML = '';
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `
+      <p class="gear-status">Logged in</p>
+      <p class="gear-email">${user.email}</p>
+      <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
+  }
+
+  // ---- Theme ----
+
+  function applyTheme(theme) {
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+  }
+
+  function initTheme() {
+    let saved = 'dark';
+    try { saved = localStorage.getItem('scrollswap_theme') || 'dark'; } catch (e) {}
+    applyTheme(saved);
+  }
+
+  // ---- Nav dropdown ----
+
+  function initNav() {
+    const toggle = document.getElementById('navToggle');
+    const dropdown = document.getElementById('navDropdown');
+    const gearToggle = document.getElementById('gearToggle');
+    const gearDropdown = document.getElementById('gearDropdown');
+    toggle.addEventListener('click', (e) => { e.stopPropagation(); gearDropdown.classList.remove('open'); dropdown.classList.toggle('open'); });
+    gearToggle.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.remove('open'); gearDropdown.classList.toggle('open'); });
+    document.addEventListener('click', () => { dropdown.classList.remove('open'); gearDropdown.classList.remove('open'); });
+  }
+
+  function renderSyncNote() {
+    const el = document.getElementById('syncNote');
+    if (!el) return;
+    if (!currentUser) el.textContent = 'Log in to see stats synced across devices';
+    else if (syncing) el.textContent = 'Syncing\u2026';
+    else el.textContent = 'Showing data synced to your account';
+  }
+
+  // ---- Init ----
+
+  function initApp() {
+    initTheme();
+    renderQuote();
+    renderStats();
+    renderChart();
+    initChartToggle();
+    initNav();
+  }
+
+  function initIdentity() {
+    if (typeof netlifyIdentity === 'undefined') {
+      document.getElementById('authCard').innerHTML = '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      return;
+    }
+    netlifyIdentity.on('init', async user => {
+      currentUser = user || null;
+      if (user) {
+        renderAuthLoggedIn(user);
+        syncing = true;
+        renderSyncNote();
+        await Promise.all([pullPomodoroReadOnly(), pullTodosReadOnly(), pullGoalsReadOnly()]);
+        syncing = false;
+      } else {
+        renderAuthLoggedOut();
+      }
+      renderStats();
+      renderChart();
+      renderSyncNote();
+    });
+    netlifyIdentity.on('login', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      netlifyIdentity.close();
+      syncing = true;
+      renderSyncNote();
+      await Promise.all([pullPomodoroReadOnly(), pullTodosReadOnly(), pullGoalsReadOnly()]);
+      syncing = false;
+      renderStats();
+      renderChart();
+      renderSyncNote();
+    });
+    netlifyIdentity.on('logout', () => { currentUser = null; renderAuthLoggedOut(); renderSyncNote(); });
+    netlifyIdentity.on('signup', user => { currentUser = user; renderAuthLoggedIn(user); });
+    netlifyIdentity.init();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    if (typeof netlifyIdentity !== 'undefined') { initIdentity(); }
+    else { window.addEventListener('load', initIdentity); }
+  });
+})();
+</script>
+</body>
+</html>

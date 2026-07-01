@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Settings &middot; Scroll Swap</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Settings">
+<meta name="theme-color" content="#1C1F1D">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Ccircle cx='90' cy='90' r='16' fill='none' stroke='%237A9B7E' stroke-width='8'/%3E%3Cpath d='M90 58v-10M90 132v10M58 90h-10M132 90h10M68 68l-7-7M112 112l7 7M112 68l7-7M68 112l-7 7' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Ccircle cx='90' cy='90' r='16' fill='none' stroke='%237A9B7E' stroke-width='8'/%3E%3Cpath d='M90 58v-10M90 132v10M58 90h-10M132 90h10M68 68l-7-7M112 112l7 7M112 68l7-7M68 112l-7 7' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; min-height: 100dvh; }
+  body {
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: max(28px, env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom);
+  }
+  :root {
+    --ink: #EDEAE2;
+    --ink-dim: #A8A296;
+    --bg: #1C1F1D;
+    --card: #242824;
+    --card-line: #34392F;
+    --gold: #C9A24B;
+    --sage: #7A9B7E;
+  }
+  :root.theme-light {
+    --ink: #2A2A26;
+    --ink-dim: #8A8478;
+    --bg: #F3F1EA;
+    --card: #FFFFFF;
+    --card-line: #DDD8CB;
+    --gold: #A97F2E;
+    --sage: #4F7A57;
+  }
+
+  #app {
+    font-family: Georgia, 'Iowan Old Style', serif; color: var(--ink); background: var(--bg);
+    padding: 8px 22px 40px; max-width: 480px; width: 100%; margin: 0 auto;
+  }
+
+  /* Nav */
+  .nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; position: relative; }
+  .nav-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--card); color: var(--ink); border: 1px solid var(--card-line); border-radius: 7px;
+    padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .nav-dropdown {
+    position: absolute; top: 42px; left: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 190px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nav-dropdown.open { display: block; }
+  .nav-link {
+    display: block; padding: 12px 16px; font-family: 'Courier New', monospace; font-size: 12.5px;
+    color: var(--ink-dim); text-decoration: none; border-bottom: 1px solid var(--card-line);
+  }
+  .nav-link:last-child { border-bottom: none; }
+  .nav-link.active { color: var(--gold); }
+
+  .gear-btn {
+    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
+    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .gear-dropdown {
+    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
+  }
+  .gear-dropdown.open { display: block; }
+  .gear-status {
+    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
+  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
+
+  .header { margin-bottom: 18px; }
+  .eyebrow {
+    font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 6px;
+  }
+  .title { font-size: 26px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink-dim); margin: 0; }
+
+  .auth-card {
+    margin: 16px 0 20px; padding: 14px 16px; background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .auth-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
+  .auth-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 2px 0 0; }
+  .auth-btn {
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--gold); color: var(--bg); border: none; border-radius: 6px; padding: 9px 14px;
+    cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  .auth-btn.secondary { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+
+  .section-card {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 18px; margin-bottom: 16px;
+  }
+  .section-title {
+    font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-dim); margin: 0 0 14px;
+  }
+  .theme-toggle-row { display: flex; gap: 8px; }
+  .theme-btn {
+    flex: 1; font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase;
+    background: var(--bg); color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 7px;
+    padding: 11px 8px; cursor: pointer;
+  }
+  .theme-btn.selected { background: var(--gold); color: var(--card); border-color: var(--gold); font-weight: 600; }
+
+  .account-section-body { display: flex; flex-direction: column; gap: 10px; }
+  .account-logged-in-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="nav-row">
+    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="dashboard.html" class="nav-link">Dashboard</a>
+      <a href="goals.html" class="nav-link">Goals</a>
+      <a href="lock-in.html" class="nav-link">Lock In</a>
+      <a href="pomodoro.html" class="nav-link">Pomodoro</a>
+      <a href="diary.html" class="nav-link">Diary</a>
+      <a href="todo.html" class="nav-link">To-Do</a>
+      <a href="settings.html" class="nav-link active">Settings</a>
+    </div>
+    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <div class="gear-dropdown" id="gearDropdown">
+      <div id="gearAccountSection"></div>
+    </div>
+  </div>
+
+  <div class="header">
+    <p class="eyebrow">Preferences</p>
+    <h1 class="title">Settings</h1>
+    <p class="subtitle">Your account and how the app looks.</p>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <p class="auth-status">Checking login&hellip;</p>
+  </div>
+
+  <div class="section-card" id="accountSection" style="display:none;">
+    <p class="section-title">Account</p>
+    <div class="account-section-body" id="accountSectionBody"></div>
+  </div>
+
+  <div class="section-card">
+    <p class="section-title">Appearance</p>
+    <div class="theme-toggle-row">
+      <button class="theme-btn" data-theme="dark">Dark</button>
+      <button class="theme-btn" data-theme="light">Light</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  let currentUser = null;
+
+  // ---- Auth UI ----
+
+  function renderAuthLoggedOut() {
+    const card = document.getElementById('authCard');
+    card.style.display = 'flex';
+    card.innerHTML = `
+      <div>
+        <p class="auth-status">Not logged in</p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="auth-btn secondary" id="loginBtn">Log in</button>
+        <button class="auth-btn" id="signupBtn">Sign up</button>
+      </div>
+    `;
+    document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
+    document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `
+      <p class="gear-status">Not logged in</p>
+      <p class="gear-note">Log in to see account options here.</p>
+    `;
+
+    document.getElementById('accountSection').style.display = 'none';
+  }
+
+  function renderAuthLoggedIn(user) {
+    const card = document.getElementById('authCard');
+    card.style.display = 'none';
+    card.innerHTML = '';
+
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `
+      <p class="gear-status">Logged in</p>
+      <p class="gear-email">${user.email}</p>
+      <button class="auth-btn secondary" id="logoutBtnGear" style="width:100%;">Log out</button>
+    `;
+    document.getElementById('logoutBtnGear').addEventListener('click', () => netlifyIdentity.logout());
+
+    const accountSection = document.getElementById('accountSection');
+    accountSection.style.display = 'block';
+    document.getElementById('accountSectionBody').innerHTML = `
+      <div class="account-logged-in-row">
+        <div>
+          <p class="auth-status">Logged in as</p>
+          <p class="auth-email">${user.email}</p>
+        </div>
+        <button class="auth-btn secondary" id="logoutBtnMain">Log out</button>
+      </div>
+    `;
+    document.getElementById('logoutBtnMain').addEventListener('click', () => netlifyIdentity.logout());
+  }
+
+  // ---- Theme ----
+
+  function applyTheme(theme) {
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+    document.querySelectorAll('.theme-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.theme === theme);
+    });
+  }
+
+  function initTheme() {
+    let saved = 'dark';
+    try {
+      saved = localStorage.getItem('scrollswap_theme') || 'dark';
+    } catch (e) {}
+    applyTheme(saved);
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.theme;
+        applyTheme(theme);
+        try { localStorage.setItem('scrollswap_theme', theme); } catch (e) {}
+      });
+    });
+  }
+
+  // ---- Nav dropdown ----
+
+  function initNav() {
+    const toggle = document.getElementById('navToggle');
+    const dropdown = document.getElementById('navDropdown');
+    const gearToggle = document.getElementById('gearToggle');
+    const gearDropdown = document.getElementById('gearDropdown');
+
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      gearDropdown.classList.remove('open');
+      dropdown.classList.toggle('open');
+    });
+    gearToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('open');
+      gearDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => {
+      dropdown.classList.remove('open');
+      gearDropdown.classList.remove('open');
+    });
+  }
+
+  // ---- Init ----
+
+  function initApp() {
+    initTheme();
+    initNav();
+  }
+
+  function initIdentity() {
+    if (typeof netlifyIdentity === 'undefined') {
+      document.getElementById('authCard').innerHTML =
+        '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      return;
+    }
+
+    netlifyIdentity.on('init', user => {
+      currentUser = user || null;
+      if (user) {
+        renderAuthLoggedIn(user);
+      } else {
+        renderAuthLoggedOut();
+      }
+    });
+
+    netlifyIdentity.on('login', user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      netlifyIdentity.close();
+    });
+
+    netlifyIdentity.on('logout', () => {
+      currentUser = null;
+      renderAuthLoggedOut();
+    });
+
+    netlifyIdentity.on('signup', user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+    });
+
+    netlifyIdentity.init();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    if (typeof netlifyIdentity !== 'undefined') {
+      initIdentity();
+    } else {
+      window.addEventListener('load', initIdentity);
+    }
+  });
+})();
+</script>
+</body>
+</html>

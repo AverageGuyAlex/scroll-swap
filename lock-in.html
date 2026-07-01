@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lock In</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lock In">
+<meta name="theme-color" content="#0F1110">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; min-height: 100vh; min-height: 100dvh;
+    background: #0F1110; overflow: hidden;
+  }
+  .lock-screen {
+    width: 100%; height: 100vh; height: 100dvh; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .lock-text {
+    font-family: Georgia, 'Iowan Old Style', serif; font-size: 28px; color: #4A4E48; text-align: center;
+    letter-spacing: 0.02em; padding: 0 40px; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+  <div class="lock-screen" id="lockScreen">
+    <p class="lock-text">do not touch,<br>focus</p>
+  </div>
+  <script>
+    document.getElementById('lockScreen').addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>
