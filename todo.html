@@ -18,15 +18,31 @@
 
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; background: #1C1F1D; min-height: 100vh; min-height: 100dvh; }
+  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; min-height: 100dvh; }
   body {
     display: flex; align-items: flex-start; justify-content: center;
     padding-top: max(28px, env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom);
   }
+  :root {
+    --ink: #EDEAE2;
+    --ink-dim: #A8A296;
+    --bg: #1C1F1D;
+    --card: #242824;
+    --card-line: #34392F;
+    --gold: #C9A24B;
+    --sage: #7A9B7E;
+  }
+  :root.theme-light {
+    --ink: #2A2A26;
+    --ink-dim: #8A8478;
+    --bg: #F3F1EA;
+    --card: #FFFFFF;
+    --card-line: #DDD8CB;
+    --gold: #A97F2E;
+    --sage: #4F7A57;
+  }
 
   #app {
-    --ink: #EDEAE2; --ink-dim: #A8A296; --bg: #1C1F1D; --card: #242824; --card-line: #34392F;
-    --gold: #C9A24B; --sage: #7A9B7E;
     font-family: Georgia, 'Iowan Old Style', serif; color: var(--ink); background: var(--bg);
     padding: 8px 22px 40px; max-width: 480px; width: 100%; margin: 0 auto;
   }
@@ -67,6 +83,19 @@
   }
   .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
   .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
+  .theme-toggle-row {
+    display: flex; gap: 6px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--card-line);
+  }
+  .theme-btn {
+    flex: 1; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase;
+    background: var(--bg); color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 6px;
+    padding: 8px 6px; cursor: pointer;
+  }
+  .theme-btn.selected { background: var(--gold); color: var(--card); border-color: var(--gold); font-weight: 600; }
+  .gear-settings-link {
+    display: block; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-line);
+    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
+  }
 
   .header { margin-bottom: 18px; }
   .eyebrow { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
@@ -161,13 +190,21 @@
   }
   .task-badge.overdue { color: #E07A5F; border-color: #E07A5F; }
 
-  .cat-due-wrap {
-    position: relative; font-family: 'Courier New', monospace; font-size: 10px; color: var(--ink-dim);
-    border: 1px solid var(--card-line); border-radius: 6px; padding: 5px 8px; cursor: pointer; white-space: nowrap;
+  .cat-due-btn {
+    font-family: 'Courier New', monospace; font-size: 10px; color: var(--ink-dim);
+    border: 1px solid var(--card-line); border-radius: 6px; padding: 5px 8px; cursor: pointer;
+    background: transparent; white-space: nowrap;
   }
-  .cat-due-wrap.overdue { color: #E07A5F; border-color: #E07A5F; }
-  .cat-due-input {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+  .cat-due-btn.overdue { color: #E07A5F; border-color: #E07A5F; }
+  .task-due-btn {
+    font-family: 'Courier New', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 5px; padding: 3px 7px;
+    cursor: pointer; background: transparent; flex-shrink: 0; white-space: nowrap;
+  }
+  .task-due-btn.overdue { color: #E07A5F; border-color: #E07A5F; }
+  .due-date-editor {
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 12px;
+    margin-bottom: 10px; display: flex; flex-direction: column; gap: 10px;
   }
 
   .add-row-btn {
@@ -213,12 +250,19 @@
     <button class="nav-btn" id="navToggle">&#9776; Menu</button>
     <div class="nav-dropdown" id="navDropdown">
       <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="dashboard.html" class="nav-link">Dashboard</a>
+      <a href="goals.html" class="nav-link">Goals</a>
+      <a href="lock-in.html" class="nav-link">Lock In</a>
       <a href="pomodoro.html" class="nav-link">Pomodoro</a>
       <a href="diary.html" class="nav-link">Diary</a>
       <a href="todo.html" class="nav-link active">To-Do</a>
+      <a href="settings.html" class="nav-link">Settings</a>
     </div>
     <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
-    <div class="gear-dropdown" id="gearDropdown"></div>
+    <div class="gear-dropdown" id="gearDropdown">
+      <div id="gearAccountSection"></div>
+      <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
+    </div>
   </div>
 
   <div class="header">
@@ -253,6 +297,8 @@
   let addingCategory = false;
   let addingSubcatFor = null; // category id
   let addingTaskFor = null;   // { categoryId, subcatId }
+  let editingDueDateFor = null; // category id
+  let editingTaskDueFor = null; // { catId, subcatId, taskId }
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -434,6 +480,17 @@
     renderCategories();
   }
 
+  async function updateTaskScheduledDate(catId, subcatId, taskId, dateStr) {
+    const cat = state.categories.find(c => c.id === catId);
+    const subcat = cat && cat.subcategories.find(s => s.id === subcatId);
+    const task = subcat && subcat.tasks.find(t => t.id === taskId);
+    if (task) {
+      if (dateStr) task.scheduledDate = dateStr;
+      else delete task.scheduledDate;
+    }
+    await persist();
+  }
+
   function checkmarkSVG() {
     return '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#1C1F1D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
@@ -529,16 +586,29 @@
           ${counts.total > 0 ? `<span class="task-counter ${counts.done === counts.total ? 'complete' : ''}">${counts.done}/${counts.total}</span>` : ''}
           ${complete ? '<span class="cat-check">&#10003;</span>' : ''}
           <div class="cat-actions">
-            <label class="cat-due-wrap ${dueOverdue ? 'overdue' : ''}" title="Set due date">
+            <button class="cat-due-btn ${dueOverdue ? 'overdue' : ''}" data-cat-id="${cat.id}">
               ${cat.dueDate ? `Due ${formatShortDate(cat.dueDate)}` : 'Set due date'}
-              <input type="date" class="cat-due-input" data-cat-id="${cat.id}" value="${cat.dueDate || ''}">
-            </label>
+            </button>
             <button class="icon-btn delete-cat-btn" data-cat-id="${cat.id}">&times;</button>
           </div>
         </div>
         <div class="cat-body">
+          ${editingDueDateFor === cat.id ? renderDueDateEditor(cat) : ''}
           ${cat.subcategories.map(sc => renderSubcatBlock(cat, sc)).join('')}
           ${addingSubcatFor === cat.id ? renderAddSubcatForm(cat.id) : `<button class="add-row-btn add-subcat-trigger" data-cat-id="${cat.id}">+ Add subcategory</button>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDueDateEditor(cat) {
+    return `
+      <div class="due-date-editor">
+        <input type="date" class="inline-input due-date-input" data-cat-id="${cat.id}" value="${cat.dueDate || ''}">
+        <div class="inline-row">
+          <button class="inline-btn cancel clear-due-btn" data-cat-id="${cat.id}">Clear</button>
+          <button class="inline-btn cancel cancel-due-btn" data-cat-id="${cat.id}">Cancel</button>
+          <button class="inline-btn confirm save-due-btn" data-cat-id="${cat.id}">Save</button>
         </div>
       </div>
     `;
@@ -566,19 +636,38 @@
     `;
   }
 
+  function renderTaskDueDateEditor(catId, subcatId, task) {
+    return `
+      <div class="due-date-editor" style="margin: 4px 0 8px 34px;">
+        <input type="date" class="inline-input task-due-date-input" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}" value="${task.scheduledDate || ''}">
+        <div class="inline-row">
+          <button class="inline-btn cancel clear-task-due-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">Clear</button>
+          <button class="inline-btn cancel cancel-task-due-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">Cancel</button>
+          <button class="inline-btn confirm save-task-due-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">Save</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderTaskRow(catId, subcatId, task) {
     const done = isTaskDone(task);
     const overdue = isOverdue(task.scheduledDate, done);
+    const isEditingThis = editingTaskDueFor && editingTaskDueFor.catId === catId
+      && editingTaskDueFor.subcatId === subcatId && editingTaskDueFor.taskId === task.id;
     return `
       <div class="task-row">
         <div class="task-box ${done ? 'checked' : ''}" data-task-id="${task.id}" data-cat-id="${catId}" data-subcat-id="${subcatId}">
           ${checkmarkSVG()}
         </div>
         <span class="task-text ${done ? 'checked' : ''}" data-task-id="${task.id}" data-cat-id="${catId}" data-subcat-id="${subcatId}">${task.text}</span>
-        ${task.recurring ? '<span class="task-badge">Recurring</span>' : ''}
-        ${task.scheduledDate ? `<span class="task-badge ${overdue ? 'overdue' : ''}">${overdue ? 'Overdue ' : ''}${formatShortDate(task.scheduledDate)}</span>` : ''}
+        ${task.recurring ? '<span class="task-badge">Recurring</span>' : `
+          <button class="task-due-btn ${overdue ? 'overdue' : ''}" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">
+            ${task.scheduledDate ? `${overdue ? 'Overdue ' : ''}${formatShortDate(task.scheduledDate)}` : 'Set due date'}
+          </button>
+        `}
         <button class="icon-btn delete-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">&times;</button>
       </div>
+      ${isEditingThis ? renderTaskDueDateEditor(catId, subcatId, task) : ''}
     `;
   }
 
@@ -602,10 +691,7 @@
           <input type="checkbox" class="new-task-recurring" data-cat-id="${catId}" data-subcat-id="${subcatId}">
           Recurring (resets daily)
         </label>
-        <label style="display:flex; align-items:center; gap:8px; font-family:'Courier New', monospace; font-size:12px; color:var(--ink-dim);">
-          Schedule for (optional)
-          <input type="date" class="inline-input new-task-schedule" data-cat-id="${catId}" data-subcat-id="${subcatId}" style="width:auto; padding:6px 8px;">
-        </label>
+        <p class="gear-note" style="margin:0;">You can set a due date for this task after adding it.</p>
         <div class="inline-row">
           <button class="inline-btn cancel cancel-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}">Cancel</button>
           <button class="inline-btn confirm confirm-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}">Add</button>
@@ -675,22 +761,41 @@
         const catId = btn.dataset.catId, subcatId = btn.dataset.subcatId;
         const textInput = document.querySelector(`.new-task-text[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
         const recurringInput = document.querySelector(`.new-task-recurring[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
-        const scheduleInput = document.querySelector(`.new-task-schedule[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
         const text = textInput.value.trim();
         if (!text) return;
-        await addTask(catId, subcatId, text, recurringInput.checked, scheduleInput.value);
+        await addTask(catId, subcatId, text, recurringInput.checked, null);
         addingTaskFor = null;
         renderCategories();
       });
     });
 
-    // Category due date change
-    document.querySelectorAll('.cat-due-input').forEach(input => {
-      input.addEventListener('change', async () => {
-        await updateCategoryDueDate(input.dataset.catId, input.value);
+    // Category due date button
+    document.querySelectorAll('.cat-due-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editingDueDateFor = editingDueDateFor === btn.dataset.catId ? null : btn.dataset.catId;
         renderCategories();
       });
-      input.addEventListener('click', (e) => e.stopPropagation());
+    });
+    document.querySelectorAll('.cancel-due-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editingDueDateFor = null;
+        renderCategories();
+      });
+    });
+    document.querySelectorAll('.clear-due-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await updateCategoryDueDate(btn.dataset.catId, '');
+        editingDueDateFor = null;
+        renderCategories();
+      });
+    });
+    document.querySelectorAll('.save-due-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const input = document.querySelector(`.due-date-input[data-cat-id="${btn.dataset.catId}"]`);
+        await updateCategoryDueDate(btn.dataset.catId, input.value);
+        editingDueDateFor = null;
+        renderCategories();
+      });
     });
 
     // Toggle task
@@ -707,6 +812,38 @@
     // Delete task
     document.querySelectorAll('.delete-task-btn').forEach(btn => {
       btn.addEventListener('click', () => deleteTask(btn.dataset.catId, btn.dataset.subcatId, btn.dataset.taskId));
+    });
+
+    // Task due date button
+    document.querySelectorAll('.task-due-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = { catId: btn.dataset.catId, subcatId: btn.dataset.subcatId, taskId: btn.dataset.taskId };
+        const isSame = editingTaskDueFor && editingTaskDueFor.catId === key.catId
+          && editingTaskDueFor.subcatId === key.subcatId && editingTaskDueFor.taskId === key.taskId;
+        editingTaskDueFor = isSame ? null : key;
+        renderCategories();
+      });
+    });
+    document.querySelectorAll('.cancel-task-due-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editingTaskDueFor = null;
+        renderCategories();
+      });
+    });
+    document.querySelectorAll('.clear-task-due-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await updateTaskScheduledDate(btn.dataset.catId, btn.dataset.subcatId, btn.dataset.taskId, '');
+        editingTaskDueFor = null;
+        renderCategories();
+      });
+    });
+    document.querySelectorAll('.save-task-due-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const input = document.querySelector(`.task-due-date-input[data-task-id="${btn.dataset.taskId}"]`);
+        await updateTaskScheduledDate(btn.dataset.catId, btn.dataset.subcatId, btn.dataset.taskId, input.value);
+        editingTaskDueFor = null;
+        renderCategories();
+      });
     });
   }
 
@@ -727,9 +864,9 @@
     document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
     document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
 
-    const gear = document.getElementById('gearDropdown');
-    gear.innerHTML = `
-      <p class="gear-status">Settings</p>
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `
+      <p class="gear-status">Not logged in</p>
       <p class="gear-note">Log in to see account options here.</p>
     `;
   }
@@ -739,13 +876,37 @@
     card.style.display = 'none';
     card.innerHTML = '';
 
-    const gear = document.getElementById('gearDropdown');
-    gear.innerHTML = `
+    const gearAccount = document.getElementById('gearAccountSection');
+    gearAccount.innerHTML = `
       <p class="gear-status">Logged in</p>
       <p class="gear-email">${user.email}</p>
       <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
+  }
+
+  // ---- Theme ----
+
+  function applyTheme(theme) {
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+    document.querySelectorAll('.theme-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.theme === theme);
+    });
+  }
+
+  function initTheme() {
+    let saved = 'dark';
+    try {
+      saved = localStorage.getItem('scrollswap_theme') || 'dark';
+    } catch (e) {}
+    applyTheme(saved);
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.theme;
+        applyTheme(theme);
+        try { localStorage.setItem('scrollswap_theme', theme); } catch (e) {}
+      });
+    });
   }
 
   // ---- Nav dropdown ----
@@ -871,6 +1032,7 @@
   // ---- Init ----
 
   function initApp() {
+    initTheme();
     loadLocal();
     renderAddCategoryArea();
     renderCategories();
