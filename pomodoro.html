@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pomodoro &middot; Scroll Swap</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pomodoro">
+<meta name="theme-color" content="#1C1F1D">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Ccircle cx='90' cy='95' r='38' fill='none' stroke='%237A9B7E' stroke-width='10'/%3E%3Cline x1='90' y1='95' x2='90' y2='68' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='90' y1='95' x2='110' y2='95' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Ccircle cx='90' cy='95' r='38' fill='none' stroke='%237A9B7E' stroke-width='10'/%3E%3Cline x1='90' y1='95' x2='90' y2='68' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='90' y1='95' x2='110' y2='95' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #1C1F1D;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: max(28px, env(safe-area-inset-top));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  #app {
+    --ink: #EDEAE2;
+    --ink-dim: #A8A296;
+    --bg: #1C1F1D;
+    --card: #242824;
+    --card-line: #34392F;
+    --gold: #C9A24B;
+    --sage: #7A9B7E;
+    --rust: #B5654A;
+    --cat-productivity: #6FA37A;
+    --cat-workout: #C1503F;
+    --cat-reading: #D9B54A;
+    font-family: Georgia, 'Iowan Old Style', serif;
+    color: var(--ink);
+    background: var(--bg);
+    padding: 8px 22px 40px;
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* Nav */
+  .nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .nav-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--card-line);
+    border-radius: 7px;
+    padding: 9px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-dropdown {
+    position: absolute;
+    top: 42px;
+    left: 0;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 10;
+    min-width: 190px;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nav-dropdown.open { display: block; }
+  .nav-link {
+    display: block;
+    padding: 12px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    text-decoration: none;
+    border-bottom: 1px solid var(--card-line);
+  }
+  .nav-link:last-child { border-bottom: none; }
+  .nav-link.active { color: var(--gold); }
+  .nav-link.disabled { opacity: 0.4; pointer-events: none; }
+
+  .header { margin-bottom: 18px; }
+  .eyebrow {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 0 0 6px;
+  }
+  .title {
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    margin: 0;
+  }
+
+  .auth-card {
+    margin: 16px 0 20px;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .auth-status {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .auth-email {
+    font-family: Georgia, serif;
+    font-size: 14.5px;
+    color: var(--ink);
+    margin: 2px 0 0;
+  }
+  .auth-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--gold);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .auth-btn.secondary {
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--card-line);
+  }
+
+  /* Category picker */
+  .category-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .cat-btn {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: var(--card);
+    color: var(--ink-dim);
+    border: 1px solid var(--card-line);
+    border-radius: 8px;
+    padding: 12px 6px;
+    cursor: pointer;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .cat-btn.selected {
+    background: var(--sage);
+    color: var(--bg);
+    border-color: var(--sage);
+    font-weight: 600;
+  }
+
+  /* Timer */
+  .timer-card {
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 14px;
+    padding: 28px 20px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .timer-display {
+    font-family: Georgia, serif;
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    margin: 0 0 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-cat-label {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    margin: 0 0 18px;
+    min-height: 14px;
+  }
+  .duration-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .duration-label {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+  }
+  .duration-input {
+    width: 60px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--card-line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .timer-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .timer-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 18px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .timer-btn.start { background: var(--sage); color: var(--bg); }
+  .timer-btn.pause { background: var(--gold); color: var(--bg); }
+  .timer-btn.reset { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+  .timer-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Totals */
+  .totals-title {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    margin: 0 0 10px;
+  }
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--card-line);
+  }
+  .total-row:last-child { border-bottom: none; }
+  .total-name-wrap { display: flex; align-items: center; gap: 10px; }
+  .cat-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .total-name { font-size: 15.5px; }
+  .total-mins {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+  }
+
+  /* Chart toggle + pie chart */
+  .chart-toggle-row {
+    text-align: center;
+    margin-top: 16px;
+  }
+  .chart-toggle-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--card-line);
+    border-radius: 7px;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  .chart-wrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+    padding: 20px;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 12px;
+  }
+  .chart-wrap.open { display: flex; }
+  .pie {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    margin-bottom: 16px;
+  }
+  .pie.empty {
+    background: var(--card-line) !important;
+  }
+  .chart-legend {
+    width: 100%;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+  }
+  .legend-name { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+  .legend-pct { color: var(--ink-dim); }
+  .chart-empty-note {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+
+  .sync-note {
+    margin-top: 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="nav-row">
+    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="pomodoro.html" class="nav-link active">Pomodoro</a>
+      <a href="#" class="nav-link disabled">Diary (coming soon)</a>
+      <a href="#" class="nav-link disabled">To-Do (coming soon)</a>
+    </div>
+  </div>
+
+  <div class="header">
+    <p class="eyebrow">Focus session</p>
+    <h1 class="title">Pomodoro</h1>
+    <p class="subtitle">Pick a category, run the clock, log the time.</p>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <p class="auth-status">Checking login&hellip;</p>
+  </div>
+
+  <div class="category-row" id="categoryRow"></div>
+
+  <div class="timer-card">
+    <p class="timer-cat-label" id="timerCatLabel"></p>
+    <p class="timer-display" id="timerDisplay">25:00</p>
+    <div class="duration-row">
+      <span class="duration-label">Minutes</span>
+      <input type="number" class="duration-input" id="durationInput" value="25" min="1" max="180">
+    </div>
+    <div class="timer-controls">
+      <button class="timer-btn start" id="startBtn">Start</button>
+      <button class="timer-btn pause" id="pauseBtn" disabled>Pause</button>
+      <button class="timer-btn reset" id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <p class="totals-title">Today's totals</p>
+  <div id="totalsList"></div>
+
+  <div class="chart-toggle-row">
+    <button class="chart-toggle-btn" id="chartToggleBtn">Show pie chart</button>
+  </div>
+  <div class="chart-wrap" id="chartWrap">
+    <div class="pie" id="pieCircle"></div>
+    <div class="chart-legend" id="chartLegend"></div>
+  </div>
+
+  <p class="sync-note" id="syncNote"></p>
+</div>
+
+<script>
+(function() {
+  const STORAGE_PREFIX = 'pomodoro_';
+  const FUNCTION_URL = '/.netlify/functions/pomodoro';
+
+  const CATEGORIES = [
+    { id: 'productivity', label: 'Productivity', color: 'var(--cat-productivity)' },
+    { id: 'workout', label: 'Working Out', color: 'var(--cat-workout)' },
+    { id: 'reading', label: 'Reading', color: 'var(--cat-reading)' },
+  ];
+
+  let selectedCategory = 'productivity';
+  let durationSeconds = 25 * 60;
+  let remainingSeconds = 25 * 60;
+  let timerHandle = null;
+  let isRunning = false;
+  let todayTotals = {};
+  let currentUser = null;
+  let syncing = false;
+
+  function dateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function todayStorageKey() { return STORAGE_PREFIX + dateKey(new Date()); }
+
+  function loadToday() {
+    try {
+      const raw = localStorage.getItem(todayStorageKey());
+      todayTotals = raw ? JSON.parse(raw) : {};
+    } catch (e) { todayTotals = {}; }
+  }
+
+  function saveTodayLocal() {
+    try {
+      localStorage.setItem(todayStorageKey(), JSON.stringify(todayTotals));
+    } catch (e) { console.error('Local save failed', e); }
+  }
+
+  function formatTime(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  // ---- Server sync ----
+
+  function collectAllLocalHistory() {
+    const history = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_PREFIX)) {
+        const date = key.slice(STORAGE_PREFIX.length);
+        try { history[date] = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+      }
+    }
+    return history;
+  }
+
+  function writeHistoryToLocal(history) {
+    Object.keys(history || {}).forEach(date => {
+      localStorage.setItem(STORAGE_PREFIX + date, JSON.stringify(history[date]));
+    });
+  }
+
+  async function pullFromServer() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch(FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const serverHistory = await res.json();
+      writeHistoryToLocal(serverHistory);
+    } catch (e) { console.error('Pull failed', e); }
+  }
+
+  async function pushToServer() {
+    if (!currentUser) return;
+    syncing = true;
+    renderSyncNote();
+    try {
+      const token = await currentUser.jwt();
+      const history = collectAllLocalHistory();
+      await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(history),
+      });
+    } catch (e) {
+      console.error('Push failed', e);
+    } finally {
+      syncing = false;
+      renderSyncNote();
+    }
+  }
+
+  function renderSyncNote() {
+    const el = document.getElementById('syncNote');
+    if (!el) return;
+    if (!currentUser) el.textContent = 'Not synced \u2014 log in to save across devices';
+    else if (syncing) el.textContent = 'Syncing\u2026';
+    else el.textContent = 'Synced to your account';
+  }
+
+  // ---- Logging time ----
+
+  async function logMinutes(category, minutes) {
+    if (minutes <= 0) return;
+    todayTotals[category] = (todayTotals[category] || 0) + minutes;
+    saveTodayLocal();
+    renderTotals();
+    if (currentUser) await pushToServer();
+  }
+
+  // ---- Category UI ----
+
+  function renderCategoryRow() {
+    const row = document.getElementById('categoryRow');
+    row.innerHTML = CATEGORIES.map(c => `
+      <button class="cat-btn ${c.id === selectedCategory ? 'selected' : ''}" data-id="${c.id}"
+        style="${c.id === selectedCategory ? `background:${c.color}; border-color:${c.color};` : ''}">${c.label}</button>
+    `).join('');
+    row.querySelectorAll('.cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (isRunning) return; // don't allow switching mid-session
+        selectedCategory = btn.dataset.id;
+        renderCategoryRow();
+        renderTimerLabel();
+      });
+    });
+  }
+
+  function renderTimerLabel() {
+    const cat = CATEGORIES.find(c => c.id === selectedCategory);
+    const label = document.getElementById('timerCatLabel');
+    label.textContent = cat ? cat.label : '';
+    label.style.color = cat ? cat.color : '';
+  }
+
+  // ---- Timer logic ----
+
+  function renderTimerDisplay() {
+    document.getElementById('timerDisplay').textContent = formatTime(remainingSeconds);
+  }
+
+  function setControlsState() {
+    document.getElementById('startBtn').disabled = isRunning;
+    document.getElementById('pauseBtn').disabled = !isRunning;
+    document.getElementById('durationInput').disabled = isRunning;
+  }
+
+  function tick() {
+    remainingSeconds--;
+    renderTimerDisplay();
+    if (remainingSeconds <= 0) {
+      clearInterval(timerHandle);
+      timerHandle = null;
+      isRunning = false;
+      setControlsState();
+      const minutesElapsed = Math.round(durationSeconds / 60);
+      logMinutes(selectedCategory, minutesElapsed);
+      remainingSeconds = durationSeconds;
+      renderTimerDisplay();
+    }
+  }
+
+  function startTimer() {
+    if (isRunning) return;
+    isRunning = true;
+    setControlsState();
+    timerHandle = setInterval(tick, 1000);
+  }
+
+  function pauseAndLog() {
+    if (!isRunning) return;
+    clearInterval(timerHandle);
+    timerHandle = null;
+    isRunning = false;
+    setControlsState();
+    const elapsedSeconds = durationSeconds - remainingSeconds;
+    const minutesElapsed = Math.floor(elapsedSeconds / 60);
+    if (minutesElapsed > 0) {
+      logMinutes(selectedCategory, minutesElapsed);
+    }
+    remainingSeconds = durationSeconds;
+    renderTimerDisplay();
+  }
+
+  function resetTimer() {
+    clearInterval(timerHandle);
+    timerHandle = null;
+    isRunning = false;
+    setControlsState();
+    remainingSeconds = durationSeconds;
+    renderTimerDisplay();
+  }
+
+  function onDurationChange() {
+    const val = parseInt(document.getElementById('durationInput').value, 10);
+    const clamped = Math.min(180, Math.max(1, isNaN(val) ? 25 : val));
+    durationSeconds = clamped * 60;
+    if (!isRunning) {
+      remainingSeconds = durationSeconds;
+      renderTimerDisplay();
+    }
+  }
+
+  // ---- Totals UI ----
+
+  function renderTotals() {
+    const list = document.getElementById('totalsList');
+    list.innerHTML = CATEGORIES.map(c => `
+      <div class="total-row">
+        <span class="total-name-wrap">
+          <span class="cat-dot" style="background:${c.color}"></span>
+          <span class="total-name">${c.label}</span>
+        </span>
+        <span class="total-mins" style="color:${c.color}">${todayTotals[c.id] || 0} min</span>
+      </div>
+    `).join('');
+    renderChart();
+  }
+
+  // ---- Pie chart ----
+
+  let chartOpen = false;
+
+  function renderChart() {
+    const pie = document.getElementById('pieCircle');
+    const legend = document.getElementById('chartLegend');
+    if (!pie || !legend) return;
+
+    const total = CATEGORIES.reduce((sum, c) => sum + (todayTotals[c.id] || 0), 0);
+
+    if (total === 0) {
+      pie.classList.add('empty');
+      pie.style.background = '';
+      legend.innerHTML = '<p class="chart-empty-note">No sessions logged yet today</p>';
+      return;
+    }
+
+    pie.classList.remove('empty');
+
+    let cursor = 0;
+    const segments = CATEGORIES.map(c => {
+      const minutes = todayTotals[c.id] || 0;
+      const pct = (minutes / total) * 100;
+      const start = cursor;
+      const end = cursor + pct;
+      cursor = end;
+      return { color: c.color, start, end, pct, label: c.label };
+    });
+
+    const gradientParts = segments
+      .filter(s => s.pct > 0)
+      .map(s => `${s.color} ${s.start}% ${s.end}%`)
+      .join(', ');
+
+    pie.style.background = `conic-gradient(${gradientParts})`;
+
+    legend.innerHTML = segments.map(s => `
+      <div class="legend-row">
+        <span class="legend-name">
+          <span class="cat-dot" style="background:${s.color}"></span>
+          ${s.label}
+        </span>
+        <span class="legend-pct">${Math.round(s.pct)}%</span>
+      </div>
+    `).join('');
+  }
+
+  function initChartToggle() {
+    const btn = document.getElementById('chartToggleBtn');
+    const wrap = document.getElementById('chartWrap');
+    btn.addEventListener('click', () => {
+      chartOpen = !chartOpen;
+      wrap.classList.toggle('open', chartOpen);
+      btn.textContent = chartOpen ? 'Hide pie chart' : 'Show pie chart';
+      if (chartOpen) renderChart();
+    });
+  }
+
+  // ---- Auth UI ----
+
+  function renderAuthLoggedOut() {
+    const card = document.getElementById('authCard');
+    card.innerHTML = `
+      <div><p class="auth-status">Not logged in</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="auth-btn secondary" id="loginBtn">Log in</button>
+        <button class="auth-btn" id="signupBtn">Sign up</button>
+      </div>
+    `;
+    document.getElementById('signupBtn').addEventListener('click', () => netlifyIdentity.open('signup'));
+    document.getElementById('loginBtn').addEventListener('click', () => netlifyIdentity.open('login'));
+  }
+
+  function renderAuthLoggedIn(user) {
+    const card = document.getElementById('authCard');
+    card.innerHTML = `
+      <div>
+        <p class="auth-status">Logged in</p>
+        <p class="auth-email">${user.email}</p>
+      </div>
+      <button class="auth-btn secondary" id="logoutBtn">Log out</button>
+    `;
+    document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
+  }
+
+  // ---- Nav dropdown ----
+
+  function initNav() {
+    const toggle = document.getElementById('navToggle');
+    const dropdown = document.getElementById('navDropdown');
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => dropdown.classList.remove('open'));
+  }
+
+  // ---- Init ----
+
+  function initApp() {
+    loadToday();
+    renderCategoryRow();
+    renderTimerLabel();
+    renderTimerDisplay();
+    setControlsState();
+    renderTotals();
+    initNav();
+    initChartToggle();
+
+    document.getElementById('startBtn').addEventListener('click', startTimer);
+    document.getElementById('pauseBtn').addEventListener('click', pauseAndLog);
+    document.getElementById('resetBtn').addEventListener('click', resetTimer);
+    document.getElementById('durationInput').addEventListener('change', onDurationChange);
+  }
+
+  function initIdentity() {
+    if (typeof netlifyIdentity === 'undefined') {
+      document.getElementById('authCard').innerHTML =
+        '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      return;
+    }
+
+    netlifyIdentity.on('init', async user => {
+      currentUser = user || null;
+      if (user) {
+        renderAuthLoggedIn(user);
+        await pullFromServer();
+      } else {
+        renderAuthLoggedOut();
+      }
+      loadToday();
+      renderTotals();
+      renderSyncNote();
+    });
+
+    netlifyIdentity.on('login', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      netlifyIdentity.close();
+      await pullFromServer();
+      loadToday();
+      renderTotals();
+      await pushToServer();
+    });
+
+    netlifyIdentity.on('logout', () => {
+      currentUser = null;
+      renderAuthLoggedOut();
+      renderSyncNote();
+    });
+
+    netlifyIdentity.on('signup', async user => {
+      currentUser = user;
+      renderAuthLoggedIn(user);
+      await pushToServer();
+    });
+
+    netlifyIdentity.init();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    if (typeof netlifyIdentity !== 'undefined') {
+      initIdentity();
+    } else {
+      window.addEventListener('load', initIdentity);
+    }
+  });
+})();
+</script>
+</body>
+</html>
