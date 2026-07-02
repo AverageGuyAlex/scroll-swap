@@ -83,7 +83,7 @@
       const newTotal = getLocalTotal() + elapsedMinutes;
       setLocalTotal(newTotal);
       pushToServer(newTotal); // fire in the background — don't make the person wait to exit
-      window.location.href = 'index.html';
+      window.location.href = 'dashboard.html';
     }
 
     document.getElementById('lockScreen').addEventListener('click', recordSessionAndExit);
