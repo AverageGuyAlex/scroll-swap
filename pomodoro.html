@@ -517,12 +517,12 @@
 
   let selectedCategory = 'productivity';
   let durationSeconds = 25 * 60;
-  let remainingSeconds = 25 * 60;
-  let timerHandle = null;
-  let isRunning = false;
+  let timerDisplayHandle = null;
   let todayTotals = {};
   let currentUser = null;
   let syncing = false;
+
+  const TIMER_STATE_KEY = 'scrollswap_pomodoro_timer';
 
   function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -546,6 +546,36 @@
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
     return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  // ---- Persistent timer state (survives page navigation, tab switches, reloads) ----
+
+  function defaultTimerState() {
+    return {
+      category: 'productivity',
+      durationSeconds: 25 * 60,
+      remainingAtAnchor: 25 * 60,
+      anchorTimestamp: null,
+      running: false,
+    };
+  }
+
+  function loadTimerState() {
+    try {
+      const raw = localStorage.getItem(TIMER_STATE_KEY);
+      return raw ? JSON.parse(raw) : defaultTimerState();
+    } catch (e) { return defaultTimerState(); }
+  }
+
+  function saveTimerState(ts) {
+    try { localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(ts)); }
+    catch (e) { console.error('Timer state save failed', e); }
+  }
+
+  function currentRemaining(ts) {
+    if (!ts.running) return ts.remainingAtAnchor;
+    const elapsed = Math.floor((Date.now() - ts.anchorTimestamp) / 1000);
+    return Math.max(0, ts.remainingAtAnchor - elapsed);
   }
 
   // ---- Server sync ----
@@ -627,8 +657,11 @@
     `).join('');
     row.querySelectorAll('.cat-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (isRunning) return; // don't allow switching mid-session
+        const ts = loadTimerState();
+        if (ts.running || ts.remainingAtAnchor !== ts.durationSeconds) return; // don't allow switching mid-session
         selectedCategory = btn.dataset.id;
+        ts.category = selectedCategory;
+        saveTimerState(ts);
         renderCategoryRow();
         renderTimerLabel();
       });
@@ -644,69 +677,137 @@
 
   // ---- Timer logic ----
 
-  function renderTimerDisplay() {
-    document.getElementById('timerDisplay').textContent = formatTime(remainingSeconds);
+  function renderTimerDisplay(remaining) {
+    document.getElementById('timerDisplay').textContent = formatTime(remaining);
   }
 
-  function setControlsState() {
-    document.getElementById('startBtn').disabled = isRunning;
-    document.getElementById('pauseBtn').disabled = !isRunning;
-    document.getElementById('durationInput').disabled = isRunning;
+  function setControlsState(ts) {
+    const fresh = !ts.running && ts.remainingAtAnchor === ts.durationSeconds;
+    const paused = !ts.running && !fresh;
+    document.getElementById('startBtn').disabled = ts.running || paused;
+    document.getElementById('durationInput').disabled = ts.running || paused;
+    const pauseBtn = document.getElementById('pauseBtn');
+    pauseBtn.disabled = fresh;
+    pauseBtn.textContent = ts.running ? 'Pause' : 'Resume';
+  }
+
+  function stopDisplayTicker() {
+    if (timerDisplayHandle) {
+      clearInterval(timerDisplayHandle);
+      timerDisplayHandle = null;
+    }
   }
 
   function tick() {
-    remainingSeconds--;
-    renderTimerDisplay();
-    if (remainingSeconds <= 0) {
-      clearInterval(timerHandle);
-      timerHandle = null;
-      isRunning = false;
-      setControlsState();
-      const minutesElapsed = Math.round(durationSeconds / 60);
-      logMinutes(selectedCategory, minutesElapsed);
-      remainingSeconds = durationSeconds;
-      renderTimerDisplay();
+    const ts = loadTimerState();
+    if (!ts.running) { stopDisplayTicker(); return; }
+    const remaining = currentRemaining(ts);
+    renderTimerDisplay(remaining);
+    if (remaining <= 0) {
+      completeTimer(ts);
     }
+  }
+
+  function startDisplayTicker() {
+    stopDisplayTicker();
+    timerDisplayHandle = setInterval(tick, 1000);
+  }
+
+  function completeTimer(ts) {
+    stopDisplayTicker();
+    const minutesElapsed = Math.round(ts.durationSeconds / 60);
+    const freshState = defaultTimerState();
+    freshState.category = ts.category;
+    freshState.durationSeconds = ts.durationSeconds;
+    freshState.remainingAtAnchor = ts.durationSeconds;
+    saveTimerState(freshState);
+    renderTimerDisplay(freshState.remainingAtAnchor);
+    setControlsState(freshState);
+    logMinutes(ts.category, minutesElapsed);
   }
 
   function startTimer() {
-    if (isRunning) return;
-    isRunning = true;
-    setControlsState();
-    timerHandle = setInterval(tick, 1000);
+    const ts = loadTimerState();
+    if (ts.running) return;
+    ts.running = true;
+    ts.anchorTimestamp = Date.now();
+    ts.category = selectedCategory;
+    ts.durationSeconds = durationSeconds;
+    if (ts.remainingAtAnchor !== durationSeconds) {
+      // stale leftover from a different duration setting; treat as fresh
+      ts.remainingAtAnchor = durationSeconds;
+    }
+    saveTimerState(ts);
+    setControlsState(ts);
+    startDisplayTicker();
+    renderTimerDisplay(currentRemaining(ts));
   }
 
-  function pauseAndLog() {
-    if (!isRunning) return;
-    clearInterval(timerHandle);
-    timerHandle = null;
-    isRunning = false;
-    setControlsState();
-    const elapsedSeconds = durationSeconds - remainingSeconds;
-    const minutesElapsed = Math.floor(elapsedSeconds / 60);
-    if (minutesElapsed > 0) {
-      logMinutes(selectedCategory, minutesElapsed);
+  function togglePauseResume() {
+    const ts = loadTimerState();
+    if (ts.running) {
+      // Pause: freeze the remaining time
+      ts.remainingAtAnchor = currentRemaining(ts);
+      ts.running = false;
+      ts.anchorTimestamp = null;
+      saveTimerState(ts);
+      stopDisplayTicker();
+      renderTimerDisplay(ts.remainingAtAnchor);
+      setControlsState(ts);
+    } else {
+      // Resume
+      if (ts.remainingAtAnchor <= 0 || ts.remainingAtAnchor === ts.durationSeconds) return;
+      ts.running = true;
+      ts.anchorTimestamp = Date.now();
+      saveTimerState(ts);
+      startDisplayTicker();
+      renderTimerDisplay(currentRemaining(ts));
+      setControlsState(ts);
     }
-    remainingSeconds = durationSeconds;
-    renderTimerDisplay();
   }
 
   function resetTimer() {
-    clearInterval(timerHandle);
-    timerHandle = null;
-    isRunning = false;
-    setControlsState();
-    remainingSeconds = durationSeconds;
-    renderTimerDisplay();
+    stopDisplayTicker();
+    const ts = defaultTimerState();
+    ts.category = selectedCategory;
+    ts.durationSeconds = durationSeconds;
+    ts.remainingAtAnchor = durationSeconds;
+    saveTimerState(ts);
+    renderTimerDisplay(ts.remainingAtAnchor);
+    setControlsState(ts);
   }
 
   function onDurationChange() {
     const val = parseInt(document.getElementById('durationInput').value, 10);
     const clamped = Math.min(180, Math.max(1, isNaN(val) ? 25 : val));
     durationSeconds = clamped * 60;
-    if (!isRunning) {
-      remainingSeconds = durationSeconds;
-      renderTimerDisplay();
+    const ts = loadTimerState();
+    if (!ts.running && ts.remainingAtAnchor === ts.durationSeconds) {
+      ts.durationSeconds = durationSeconds;
+      ts.remainingAtAnchor = durationSeconds;
+      saveTimerState(ts);
+      renderTimerDisplay(durationSeconds);
+    }
+  }
+
+  function restoreTimerOnLoad() {
+    const ts = loadTimerState();
+    selectedCategory = ts.category || 'productivity';
+    durationSeconds = ts.durationSeconds || 25 * 60;
+    document.getElementById('durationInput').value = Math.round(durationSeconds / 60);
+
+    if (ts.running) {
+      const remaining = currentRemaining(ts);
+      if (remaining <= 0) {
+        completeTimer(ts);
+        return;
+      }
+      renderTimerDisplay(remaining);
+      setControlsState(ts);
+      startDisplayTicker();
+    } else {
+      renderTimerDisplay(ts.remainingAtAnchor);
+      setControlsState(ts);
     }
   }
 
@@ -911,18 +1012,31 @@
   function initApp() {
     initTheme();
     loadToday();
+    restoreTimerOnLoad();
     renderCategoryRow();
     renderTimerLabel();
-    renderTimerDisplay();
-    setControlsState();
     renderTotals();
     initNav();
     initChartToggle();
 
     document.getElementById('startBtn').addEventListener('click', startTimer);
-    document.getElementById('pauseBtn').addEventListener('click', pauseAndLog);
+    document.getElementById('pauseBtn').addEventListener('click', togglePauseResume);
     document.getElementById('resetBtn').addEventListener('click', resetTimer);
     document.getElementById('durationInput').addEventListener('change', onDurationChange);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        const ts = loadTimerState();
+        if (ts.running) {
+          const remaining = currentRemaining(ts);
+          if (remaining <= 0) {
+            completeTimer(ts);
+          } else {
+            renderTimerDisplay(remaining);
+          }
+        }
+      }
+    });
   }
 
   function initIdentity() {
