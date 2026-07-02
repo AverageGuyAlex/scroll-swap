@@ -30,9 +30,20 @@
     <p class="lock-text">do not touch,<br>focus</p>
   </div>
   <script>
-    document.getElementById('lockScreen').addEventListener('click', () => {
+    const LOCKIN_TOTAL_KEY = 'scrollswap_lockin_total_minutes';
+    const sessionStart = Date.now();
+
+    function recordSessionAndExit() {
+      const elapsedMinutes = (Date.now() - sessionStart) / 60000;
+      try {
+        const raw = localStorage.getItem(LOCKIN_TOTAL_KEY);
+        const current = raw ? parseFloat(raw) : 0;
+        localStorage.setItem(LOCKIN_TOTAL_KEY, String(current + elapsedMinutes));
+      } catch (e) {}
       window.location.href = 'index.html';
-    });
+    }
+
+    document.getElementById('lockScreen').addEventListener('click', recordSessionAndExit);
   </script>
 </body>
 </html>
