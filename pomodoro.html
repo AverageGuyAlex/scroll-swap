@@ -502,6 +502,7 @@
   </div>
 
   <p class="sync-note" id="syncNote"></p>
+  <p class="sync-note" id="debugTimerState" style="word-break:break-all; opacity:0.7; margin-top:4px;"></p>
 </div>
 
 <script>
@@ -742,6 +743,8 @@
     setControlsState(ts);
     startDisplayTicker();
     renderTimerDisplay(currentRemaining(ts));
+    const debugEl = document.getElementById('debugTimerState');
+    if (debugEl) debugEl.textContent = 'debug: ' + JSON.stringify(loadTimerState());
   }
 
   function togglePauseResume() {
@@ -797,6 +800,8 @@
   // login/network, so the timer never looks "stuck" just because identity is slow.
   function displayTimerFromLocal() {
     const ts = loadTimerState();
+    const debugEl = document.getElementById('debugTimerState');
+    if (debugEl) debugEl.textContent = 'debug: ' + JSON.stringify(ts);
     selectedCategory = ts.category || 'productivity';
     durationSeconds = ts.durationSeconds || 25 * 60;
     document.getElementById('durationInput').value = Math.round(durationSeconds / 60);
