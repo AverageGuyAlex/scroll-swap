@@ -383,7 +383,33 @@
   function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
-  function todayKey() { return STORAGE_PREFIX + dateKey(new Date()); }
+
+  function getResetHour() {
+    try {
+      const raw = localStorage.getItem('scrollswap_reset_hour');
+      const h = raw !== null ? parseInt(raw, 10) : 0;
+      return (isNaN(h) || h < 0 || h > 23) ? 0 : h;
+    } catch (e) { return 0; }
+  }
+
+  function getEffectiveDate() {
+    const now = new Date();
+    const resetHour = getResetHour();
+    const effective = new Date(now);
+    if (now.getHours() < resetHour) {
+      effective.setDate(effective.getDate() - 1);
+    }
+    return effective;
+  }
+
+  function formatResetHourLabel(hour) {
+    const period = hour < 12 ? 'AM' : 'PM';
+    let h12 = hour % 12;
+    if (h12 === 0) h12 = 12;
+    return `${h12}:00 ${period}`;
+  }
+
+  function todayKey() { return STORAGE_PREFIX + dateKey(getEffectiveDate()); }
 
   function checkmarkSVG() {
     return '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#1C1F1D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -423,7 +449,7 @@
 
   function computeStreak() {
     let count = 0;
-    let cursor = new Date();
+    let cursor = getEffectiveDate();
     const todayWin = isWin(state);
     if (!todayWin) cursor.setDate(cursor.getDate() - 1);
     for (let i = 0; i < 365; i++) {
@@ -541,7 +567,7 @@
           </div>
         `).join('')}
       </div>
-      <p class="footer-note">${checkedCount} of ${slots.length} today &middot; resets at midnight</p>
+      <p class="footer-note">${checkedCount} of ${slots.length} today &middot; resets at ${formatResetHourLabel(getResetHour())}</p>
       <p class="sync-note" id="syncNote"></p>
       <div style="display:flex; gap:10px; margin-top:14px;">
         <button class="reset-link" id="resetBtn" style="flex:1;">clear today</button>
