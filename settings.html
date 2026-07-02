@@ -124,6 +124,9 @@
   .account-logged-in-row {
     display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
   }
+  .inline-input {
+    background: var(--bg); color: var(--ink); border: 1px solid var(--card-line); border-radius: 8px;
+  }
 </style>
 </head>
 <body>
@@ -167,6 +170,15 @@
       <button class="theme-btn" data-theme="dark">Dark</button>
       <button class="theme-btn" data-theme="light">Light</button>
     </div>
+  </div>
+
+  <div class="section-card">
+    <p class="section-title">Scroll Swap</p>
+    <label style="display:block; font-family:'Courier New', monospace; font-size:12px; color:var(--ink-dim); margin-bottom:8px;">
+      Daily reset time
+    </label>
+    <select id="resetHourSelect" class="inline-input" style="width:100%; padding:10px 12px; font-family:'Courier New', monospace; font-size:13px;"></select>
+    <p class="gear-note" style="margin-top:10px;">Your Scroll Swap slots and streak will reset at this time each day instead of midnight.</p>
   </div>
 </div>
 
@@ -251,6 +263,34 @@
     });
   }
 
+  // ---- Scroll Swap reset time ----
+
+  function formatResetHourLabel(hour) {
+    const period = hour < 12 ? 'AM' : 'PM';
+    let h12 = hour % 12;
+    if (h12 === 0) h12 = 12;
+    return `${h12}:00 ${period}`;
+  }
+
+  function initResetHour() {
+    const select = document.getElementById('resetHourSelect');
+    select.innerHTML = Array.from({ length: 24 }, (_, h) =>
+      `<option value="${h}">${formatResetHourLabel(h)}</option>`
+    ).join('');
+
+    let saved = 0;
+    try {
+      const raw = localStorage.getItem('scrollswap_reset_hour');
+      saved = raw !== null ? parseInt(raw, 10) : 0;
+      if (isNaN(saved) || saved < 0 || saved > 23) saved = 0;
+    } catch (e) {}
+    select.value = String(saved);
+
+    select.addEventListener('change', () => {
+      try { localStorage.setItem('scrollswap_reset_hour', select.value); } catch (e) {}
+    });
+  }
+
   // ---- Nav dropdown ----
 
   function initNav() {
@@ -279,6 +319,7 @@
 
   function initApp() {
     initTheme();
+    initResetHour();
     initNav();
   }
 
