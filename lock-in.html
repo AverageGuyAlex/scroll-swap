@@ -35,6 +35,7 @@
     const LOCKIN_FUNCTION_URL = '/.netlify/functions/lockin';
     const sessionStart = Date.now();
     let currentUser = null;
+    let cachedToken = null; // fetched proactively on load so exit never has to wait on a network round-trip
 
     function getLocalTotal() {
       try {
@@ -50,8 +51,8 @@
     async function pullFromServer() {
       if (!currentUser) return;
       try {
-        const token = await currentUser.jwt();
-        const res = await fetch(LOCKIN_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+        cachedToken = await currentUser.jwt();
+        const res = await fetch(LOCKIN_FUNCTION_URL, { headers: { Authorization: `Bearer ${cachedToken}` } });
         if (!res.ok) return;
         const data = await res.json();
         if (typeof data.totalMinutes === 'number') {
@@ -66,14 +67,25 @@
       } catch (e) { /* stay on local total if this fails */ }
     }
 
+    // Keeps the cached token fresh in the background so it's ready the instant
+    // someone taps to exit — GoTrue tokens are short-lived, and a session in
+    // Lock In mode can easily outlast one.
+    function startTokenRefreshLoop() {
+      setInterval(async () => {
+        if (!currentUser) return;
+        try { cachedToken = await currentUser.jwt(); } catch (e) {}
+      }, 5 * 60 * 1000);
+    }
+
     async function pushToServer(totalMinutes) {
       if (!currentUser) return;
       try {
-        const token = await currentUser.jwt();
+        const token = cachedToken || await currentUser.jwt();
         await fetch(LOCKIN_FUNCTION_URL, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ totalMinutes }),
+          keepalive: true, // lets this request finish even after we navigate away
         });
       } catch (e) { /* local save already happened; will reconcile on next visit */ }
     }
@@ -92,7 +104,10 @@
       if (typeof netlifyIdentity === 'undefined') return;
       netlifyIdentity.on('init', async user => {
         currentUser = user || null;
-        if (currentUser) await pullFromServer();
+        if (currentUser) {
+          await pullFromServer();
+          startTokenRefreshLoop();
+        }
       });
       netlifyIdentity.init();
     }
