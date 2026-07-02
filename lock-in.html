@@ -24,6 +24,7 @@
     letter-spacing: 0.02em; padding: 0 40px; line-height: 1.5;
   }
 </style>
+<script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
   <div class="lock-screen" id="lockScreen">
@@ -31,19 +32,77 @@
   </div>
   <script>
     const LOCKIN_TOTAL_KEY = 'scrollswap_lockin_total_minutes';
+    const LOCKIN_FUNCTION_URL = '/.netlify/functions/lockin';
     const sessionStart = Date.now();
+    let currentUser = null;
 
-    function recordSessionAndExit() {
-      const elapsedMinutes = (Date.now() - sessionStart) / 60000;
+    function getLocalTotal() {
       try {
         const raw = localStorage.getItem(LOCKIN_TOTAL_KEY);
-        const current = raw ? parseFloat(raw) : 0;
-        localStorage.setItem(LOCKIN_TOTAL_KEY, String(current + elapsedMinutes));
-      } catch (e) {}
+        return raw ? parseFloat(raw) : 0;
+      } catch (e) { return 0; }
+    }
+
+    function setLocalTotal(minutes) {
+      try { localStorage.setItem(LOCKIN_TOTAL_KEY, String(minutes)); } catch (e) {}
+    }
+
+    async function pullFromServer() {
+      if (!currentUser) return;
+      try {
+        const token = await currentUser.jwt();
+        const res = await fetch(LOCKIN_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.totalMinutes === 'number') {
+          setLocalTotal(data.totalMinutes);
+        }
+      } catch (e) { /* stay on local total if this fails */ }
+    }
+
+    async function pushToServer(totalMinutes) {
+      if (!currentUser) return;
+      try {
+        const token = await currentUser.jwt();
+        await fetch(LOCKIN_FUNCTION_URL, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ totalMinutes }),
+        });
+      } catch (e) { /* local save already happened; will sync next time */ }
+    }
+
+    function withTimeout(promise, ms) {
+      return Promise.race([promise, new Promise(resolve => setTimeout(resolve, ms))]);
+    }
+
+    async function recordSessionAndExit() {
+      const elapsedMinutes = (Date.now() - sessionStart) / 60000;
+      const newTotal = getLocalTotal() + elapsedMinutes;
+      setLocalTotal(newTotal);
+      // Give the sync a brief moment, but never block the exit for long.
+      await withTimeout(pushToServer(newTotal), 2000);
       window.location.href = 'index.html';
     }
 
     document.getElementById('lockScreen').addEventListener('click', recordSessionAndExit);
+
+    function initIdentity() {
+      if (typeof netlifyIdentity === 'undefined') return;
+      netlifyIdentity.on('init', async user => {
+        currentUser = user || null;
+        if (currentUser) await pullFromServer();
+      });
+      netlifyIdentity.init();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof netlifyIdentity !== 'undefined') {
+        initIdentity();
+      } else {
+        window.addEventListener('load', initIdentity);
+      }
+    });
   </script>
 </body>
 </html>
