@@ -524,6 +524,31 @@
   let syncing = false;
 
   const TIMER_STATE_KEY = 'scrollswap_pomodoro_timer';
+  const DEBUG_LOG_KEY = 'scrollswap_pomodoro_debug_log';
+
+  function debugLog(label, extra) {
+    try {
+      const raw = localStorage.getItem(DEBUG_LOG_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      log.push({ t: new Date().toISOString().slice(11, 19), label, ...extra });
+      while (log.length > 12) log.shift();
+      localStorage.setItem(DEBUG_LOG_KEY, JSON.stringify(log));
+      renderDebugLog();
+    } catch (e) {}
+  }
+
+  function renderDebugLog() {
+    const el = document.getElementById('debugTimerState');
+    if (!el) return;
+    try {
+      const raw = localStorage.getItem(DEBUG_LOG_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      el.innerHTML = log.map(entry => {
+        const { t, label, ...rest } = entry;
+        return `${t} ${label} ${JSON.stringify(rest)}`;
+      }).join('<br>');
+    } catch (e) {}
+  }
 
   function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -706,6 +731,7 @@
     const remaining = currentRemaining(ts);
     renderTimerDisplay(remaining);
     if (remaining <= 0) {
+      debugLog('tick->complete', { remaining, anchorTimestamp: ts.anchorTimestamp, remainingAtAnchor: ts.remainingAtAnchor });
       completeTimer(ts);
     }
   }
@@ -743,8 +769,7 @@
     setControlsState(ts);
     startDisplayTicker();
     renderTimerDisplay(currentRemaining(ts));
-    const debugEl = document.getElementById('debugTimerState');
-    if (debugEl) debugEl.textContent = 'debug: ' + JSON.stringify(loadTimerState());
+    debugLog('startTimer', { anchorTimestamp: ts.anchorTimestamp, remainingAtAnchor: ts.remainingAtAnchor });
   }
 
   function togglePauseResume() {
@@ -758,6 +783,7 @@
       stopDisplayTicker();
       renderTimerDisplay(ts.remainingAtAnchor);
       setControlsState(ts);
+      debugLog('pause', { remainingAtAnchor: ts.remainingAtAnchor });
     } else {
       // Resume
       if (ts.remainingAtAnchor <= 0 || ts.remainingAtAnchor === ts.durationSeconds) return;
@@ -767,6 +793,7 @@
       startDisplayTicker();
       renderTimerDisplay(currentRemaining(ts));
       setControlsState(ts);
+      debugLog('resume', { anchorTimestamp: ts.anchorTimestamp, remainingAtAnchor: ts.remainingAtAnchor });
     }
   }
 
@@ -779,6 +806,7 @@
     saveTimerState(ts);
     renderTimerDisplay(ts.remainingAtAnchor);
     setControlsState(ts);
+    debugLog('resetTimer (button pressed)', {});
   }
 
   function onDurationChange() {
@@ -791,6 +819,9 @@
       ts.remainingAtAnchor = durationSeconds;
       saveTimerState(ts);
       renderTimerDisplay(durationSeconds);
+      debugLog('onDurationChange applied', { durationSeconds });
+    } else {
+      debugLog('onDurationChange fired but ignored (session in progress)', { running: ts.running });
     }
   }
 
@@ -800,8 +831,15 @@
   // login/network, so the timer never looks "stuck" just because identity is slow.
   function displayTimerFromLocal() {
     const ts = loadTimerState();
-    const debugEl = document.getElementById('debugTimerState');
-    if (debugEl) debugEl.textContent = 'debug: ' + JSON.stringify(ts);
+    const now = Date.now();
+    const computedRemaining = ts.running ? currentRemaining(ts) : ts.remainingAtAnchor;
+    debugLog('displayTimerFromLocal', {
+      running: ts.running,
+      anchorTimestamp: ts.anchorTimestamp,
+      remainingAtAnchor: ts.remainingAtAnchor,
+      now,
+      computedRemaining,
+    });
     selectedCategory = ts.category || 'productivity';
     durationSeconds = ts.durationSeconds || 25 * 60;
     document.getElementById('durationInput').value = Math.round(durationSeconds / 60);
@@ -1053,8 +1091,11 @@
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        debugLog('visibilitychange->visible', {});
         displayTimerFromLocal();
         resolvePendingCompletion();
+      } else {
+        debugLog('visibilitychange->hidden', {});
       }
     });
   }
@@ -1064,6 +1105,7 @@
   // that finished while the app was closed, so a real completion never gets
   // silently overwritten by an out-of-date server pull.
   async function finishInitialLoad() {
+    debugLog('finishInitialLoad start', { hadPendingCompletion: !!pendingCompletion });
     loadToday();
     await resolvePendingCompletion();
     renderTotals();
