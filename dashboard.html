@@ -380,6 +380,19 @@
     } catch (e) { console.error('Goals pull failed', e); }
   }
 
+  async function pullLockInReadOnly() {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.jwt();
+      const res = await fetch('/.netlify/functions/lockin', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.totalMinutes === 'number') {
+        localStorage.setItem('scrollswap_lockin_total_minutes', String(data.totalMinutes));
+      }
+    } catch (e) { console.error('Lock In pull failed', e); }
+  }
+
   // ---- Stats rendering ----
 
   function getLockInMinutes() {
@@ -556,7 +569,7 @@
         renderAuthLoggedIn(user);
         syncing = true;
         renderSyncNote();
-        await Promise.all([pullPomodoroReadOnly(), pullTodosReadOnly(), pullGoalsReadOnly()]);
+        await Promise.all([pullPomodoroReadOnly(), pullTodosReadOnly(), pullGoalsReadOnly(), pullLockInReadOnly()]);
         syncing = false;
       } else {
         renderAuthLoggedOut();
@@ -571,7 +584,7 @@
       netlifyIdentity.close();
       syncing = true;
       renderSyncNote();
-      await Promise.all([pullPomodoroReadOnly(), pullTodosReadOnly(), pullGoalsReadOnly()]);
+      await Promise.all([pullPomodoroReadOnly(), pullTodosReadOnly(), pullGoalsReadOnly(), pullLockInReadOnly()]);
       syncing = false;
       renderStats();
       renderChart();
