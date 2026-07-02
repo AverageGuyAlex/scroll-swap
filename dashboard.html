@@ -388,7 +388,12 @@
       if (!res.ok) return;
       const data = await res.json();
       if (typeof data.totalMinutes === 'number') {
-        localStorage.setItem('scrollswap_lockin_total_minutes', String(data.totalMinutes));
+        // Merge rather than overwrite: this device's local total may include a
+        // just-recorded session whose push to the server hasn't landed yet.
+        const localRaw = localStorage.getItem('scrollswap_lockin_total_minutes');
+        const localValue = localRaw ? parseFloat(localRaw) : 0;
+        const merged = Math.max(data.totalMinutes, localValue);
+        localStorage.setItem('scrollswap_lockin_total_minutes', String(merged));
       }
     } catch (e) { console.error('Lock In pull failed', e); }
   }
