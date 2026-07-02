@@ -1033,9 +1033,8 @@
 
   function initApp() {
     initTheme();
-    loadLocal();
+    document.getElementById('categoriesList').innerHTML = '<p class="empty-note">Loading your tasks&hellip;</p>';
     renderAddCategoryArea();
-    renderCategories();
     initNav();
     initArchiveToggle();
   }
@@ -1044,6 +1043,8 @@
     if (typeof netlifyIdentity === 'undefined') {
       document.getElementById('authCard').innerHTML =
         '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      loadLocal();
+      renderCategories();
       return;
     }
 
