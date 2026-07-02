@@ -467,21 +467,30 @@
 
   // ---- Server sync (only when logged in) ----
 
+  function isScrollSwapOwnKey(suffix) {
+    // Only real date entries (YYYY-MM-DD) and the labels key belong to Scroll Swap.
+    // Other pages (Pomodoro, Settings, etc.) also use 'scrollswap_' as part of their
+    // own key names, so this must NOT match anything broader than that.
+    return suffix === '_labels' || /^\d{4}-\d{2}-\d{2}$/.test(suffix);
+  }
+
   function collectAllLocalHistory() {
     const history = {};
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith(STORAGE_PREFIX)) {
-        const date = key.slice(STORAGE_PREFIX.length);
-        try { history[date] = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+        const suffix = key.slice(STORAGE_PREFIX.length);
+        if (!isScrollSwapOwnKey(suffix)) continue;
+        try { history[suffix] = JSON.parse(localStorage.getItem(key)); } catch (e) {}
       }
     }
     return history;
   }
 
   function writeHistoryToLocal(history) {
-    Object.keys(history || {}).forEach(date => {
-      localStorage.setItem(STORAGE_PREFIX + date, JSON.stringify(history[date]));
+    Object.keys(history || {}).forEach(suffix => {
+      if (!isScrollSwapOwnKey(suffix)) return;
+      localStorage.setItem(STORAGE_PREFIX + suffix, JSON.stringify(history[suffix]));
     });
   }
 
