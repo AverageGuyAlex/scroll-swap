@@ -791,25 +791,48 @@
     }
   }
 
-  async function restoreTimerOnLoad() {
+  let pendingCompletion = null; // a finished session waiting for login status before it's safely logged
+
+  // Shows the timer immediately from whatever's saved locally — never waits on
+  // login/network, so the timer never looks "stuck" just because identity is slow.
+  function displayTimerFromLocal() {
     const ts = loadTimerState();
     selectedCategory = ts.category || 'productivity';
     durationSeconds = ts.durationSeconds || 25 * 60;
     document.getElementById('durationInput').value = Math.round(durationSeconds / 60);
+    renderCategoryRow();
+    renderTimerLabel();
 
     if (ts.running) {
       const remaining = currentRemaining(ts);
       if (remaining <= 0) {
-        await completeTimer(ts);
-        return;
+        // Finished while we were away. Show it as done, but hold off logging
+        // the minutes until we know the login state, so a completion can't
+        // get silently overwritten by a stale server pull.
+        stopDisplayTicker();
+        renderTimerDisplay(0);
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('resetBtn').disabled = true;
+        pendingCompletion = ts;
+      } else {
+        renderTimerDisplay(remaining);
+        setControlsState(ts);
+        startDisplayTicker();
+        pendingCompletion = null;
       }
-      renderTimerDisplay(remaining);
-      setControlsState(ts);
-      startDisplayTicker();
     } else {
       renderTimerDisplay(ts.remainingAtAnchor);
       setControlsState(ts);
+      pendingCompletion = null;
     }
+  }
+
+  async function resolvePendingCompletion() {
+    if (!pendingCompletion) return;
+    const ts = pendingCompletion;
+    pendingCompletion = null;
+    await completeTimer(ts);
   }
 
   // ---- Totals UI ----
@@ -1012,12 +1035,6 @@
 
   function initApp() {
     initTheme();
-    document.getElementById('timerDisplay').textContent = '--:--';
-    document.getElementById('startBtn').disabled = true;
-    document.getElementById('pauseBtn').disabled = true;
-    document.getElementById('resetBtn').disabled = true;
-    renderCategoryRow();
-    renderTimerLabel();
     initNav();
     initChartToggle();
 
@@ -1026,30 +1043,24 @@
     document.getElementById('resetBtn').addEventListener('click', resetTimer);
     document.getElementById('durationInput').addEventListener('change', onDurationChange);
 
-    document.addEventListener('visibilitychange', async () => {
+    // Show the timer right away from local data — this never waits on login/network.
+    displayTimerFromLocal();
+
+    document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        const ts = loadTimerState();
-        if (ts.running) {
-          const remaining = currentRemaining(ts);
-          if (remaining <= 0) {
-            await completeTimer(ts);
-          } else {
-            renderTimerDisplay(remaining);
-          }
-        }
+        displayTimerFromLocal();
+        resolvePendingCompletion();
       }
     });
   }
 
   // Runs once we know whether the person is logged in (and, if so, once their
-  // latest synced data has been pulled) — only then is it safe to check whether
-  // the timer finished while the app was closed, so a real completion never
-  // gets silently overwritten by an out-of-date server pull.
+  // latest synced data has been pulled) — only then is it safe to log a session
+  // that finished while the app was closed, so a real completion never gets
+  // silently overwritten by an out-of-date server pull.
   async function finishInitialLoad() {
     loadToday();
-    await restoreTimerOnLoad();
-    renderCategoryRow();
-    renderTimerLabel();
+    await resolvePendingCompletion();
     renderTotals();
   }
 
