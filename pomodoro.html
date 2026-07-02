@@ -686,6 +686,7 @@
     const paused = !ts.running && !fresh;
     document.getElementById('startBtn').disabled = ts.running || paused;
     document.getElementById('durationInput').disabled = ts.running || paused;
+    document.getElementById('resetBtn').disabled = false;
     const pauseBtn = document.getElementById('pauseBtn');
     pauseBtn.disabled = fresh;
     pauseBtn.textContent = ts.running ? 'Pause' : 'Resume';
@@ -713,7 +714,7 @@
     timerDisplayHandle = setInterval(tick, 1000);
   }
 
-  function completeTimer(ts) {
+  async function completeTimer(ts) {
     stopDisplayTicker();
     const minutesElapsed = Math.round(ts.durationSeconds / 60);
     const freshState = defaultTimerState();
@@ -723,7 +724,7 @@
     saveTimerState(freshState);
     renderTimerDisplay(freshState.remainingAtAnchor);
     setControlsState(freshState);
-    logMinutes(ts.category, minutesElapsed);
+    await logMinutes(ts.category, minutesElapsed);
   }
 
   function startTimer() {
@@ -790,7 +791,7 @@
     }
   }
 
-  function restoreTimerOnLoad() {
+  async function restoreTimerOnLoad() {
     const ts = loadTimerState();
     selectedCategory = ts.category || 'productivity';
     durationSeconds = ts.durationSeconds || 25 * 60;
@@ -799,7 +800,7 @@
     if (ts.running) {
       const remaining = currentRemaining(ts);
       if (remaining <= 0) {
-        completeTimer(ts);
+        await completeTimer(ts);
         return;
       }
       renderTimerDisplay(remaining);
@@ -1011,11 +1012,12 @@
 
   function initApp() {
     initTheme();
-    loadToday();
-    restoreTimerOnLoad();
+    document.getElementById('timerDisplay').textContent = '--:--';
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('resetBtn').disabled = true;
     renderCategoryRow();
     renderTimerLabel();
-    renderTotals();
     initNav();
     initChartToggle();
 
@@ -1024,13 +1026,13 @@
     document.getElementById('resetBtn').addEventListener('click', resetTimer);
     document.getElementById('durationInput').addEventListener('change', onDurationChange);
 
-    document.addEventListener('visibilitychange', () => {
+    document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'visible') {
         const ts = loadTimerState();
         if (ts.running) {
           const remaining = currentRemaining(ts);
           if (remaining <= 0) {
-            completeTimer(ts);
+            await completeTimer(ts);
           } else {
             renderTimerDisplay(remaining);
           }
@@ -1039,10 +1041,23 @@
     });
   }
 
+  // Runs once we know whether the person is logged in (and, if so, once their
+  // latest synced data has been pulled) — only then is it safe to check whether
+  // the timer finished while the app was closed, so a real completion never
+  // gets silently overwritten by an out-of-date server pull.
+  async function finishInitialLoad() {
+    loadToday();
+    await restoreTimerOnLoad();
+    renderCategoryRow();
+    renderTimerLabel();
+    renderTotals();
+  }
+
   function initIdentity() {
     if (typeof netlifyIdentity === 'undefined') {
       document.getElementById('authCard').innerHTML =
         '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      finishInitialLoad();
       return;
     }
 
@@ -1054,8 +1069,7 @@
       } else {
         renderAuthLoggedOut();
       }
-      loadToday();
-      renderTotals();
+      await finishInitialLoad();
       renderSyncNote();
     });
 
@@ -1064,8 +1078,7 @@
       renderAuthLoggedIn(user);
       netlifyIdentity.close();
       await pullFromServer();
-      loadToday();
-      renderTotals();
+      await finishInitialLoad();
       await pushToServer();
     });
 
