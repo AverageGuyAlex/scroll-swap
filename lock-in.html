@@ -55,7 +55,13 @@
         if (!res.ok) return;
         const data = await res.json();
         if (typeof data.totalMinutes === 'number') {
-          setLocalTotal(data.totalMinutes);
+          // Merge rather than overwrite: this device may have a local increment
+          // that hasn't finished pushing up yet, and we don't want to lose it.
+          const merged = Math.max(data.totalMinutes, getLocalTotal());
+          setLocalTotal(merged);
+          if (merged > data.totalMinutes) {
+            pushToServer(merged); // reconcile in the background, no need to wait
+          }
         }
       } catch (e) { /* stay on local total if this fails */ }
     }
@@ -69,19 +75,14 @@
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ totalMinutes }),
         });
-      } catch (e) { /* local save already happened; will sync next time */ }
+      } catch (e) { /* local save already happened; will reconcile on next visit */ }
     }
 
-    function withTimeout(promise, ms) {
-      return Promise.race([promise, new Promise(resolve => setTimeout(resolve, ms))]);
-    }
-
-    async function recordSessionAndExit() {
+    function recordSessionAndExit() {
       const elapsedMinutes = (Date.now() - sessionStart) / 60000;
       const newTotal = getLocalTotal() + elapsedMinutes;
       setLocalTotal(newTotal);
-      // Give the sync a brief moment, but never block the exit for long.
-      await withTimeout(pushToServer(newTotal), 2000);
+      pushToServer(newTotal); // fire in the background — don't make the person wait to exit
       window.location.href = 'index.html';
     }
 
