@@ -165,7 +165,12 @@
 
   /* Subcategory */
   .subcat-block { margin-top: 10px; }
-  .subcat-header { display: flex; align-items: center; gap: 8px; padding: 8px 4px; }
+  .subcat-header { display: flex; align-items: center; gap: 8px; padding: 8px 4px; cursor: pointer; }
+  .subcat-chevron {
+    display: inline-block; font-size: 11px; color: var(--ink-dim); flex-shrink: 0;
+    transition: transform 0.15s ease; transform: rotate(0deg);
+  }
+  .subcat-chevron.open { transform: rotate(90deg); }
   .subcat-name { font-size: 14.5px; font-weight: 600; flex: 1; color: var(--ink); }
   .subcat-name.complete { text-decoration: line-through; color: var(--ink-dim); }
   .subcat-check { font-size: 12px; }
@@ -299,6 +304,7 @@
   let addingTaskFor = null;   // { categoryId, subcatId }
   let editingDueDateFor = null; // category id
   let editingTaskDueFor = null; // { catId, subcatId, taskId }
+  let expandedSubcats = new Set(); // subcategory ids currently expanded
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -451,8 +457,10 @@
 
   async function addSubcategory(catId, name) {
     const cat = state.categories.find(c => c.id === catId);
-    if (cat) cat.subcategories.push({ id: uid(), name, tasks: [] });
+    const newSubcat = { id: uid(), name, tasks: [] };
+    if (cat) cat.subcategories.push(newSubcat);
     await persist();
+    return newSubcat.id;
   }
 
   async function deleteSubcategory(catId, subcatId) {
@@ -617,21 +625,24 @@
   function renderSubcatBlock(cat, subcat) {
     const complete = isSubcatComplete(subcat);
     const counts = countSubcatTasks(subcat);
-    const addKey = cat.id + '::' + subcat.id;
+    const expanded = expandedSubcats.has(subcat.id);
     return `
       <div class="subcat-block">
-        <div class="subcat-header">
+        <div class="subcat-header" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">
+          <span class="subcat-chevron ${expanded ? 'open' : ''}">&#9656;</span>
           <span class="subcat-name ${complete ? 'complete' : ''}">${subcat.name}</span>
           ${counts.total > 0 ? `<span class="task-counter ${counts.done === counts.total ? 'complete' : ''}">${counts.done}/${counts.total}</span>` : ''}
           ${complete ? '<span class="subcat-check">&#10003;</span>' : ''}
           <button class="icon-btn delete-subcat-btn" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">&times;</button>
         </div>
-        <div class="task-list">
-          ${sortedTasks(subcat).map(t => renderTaskRow(cat.id, subcat.id, t)).join('')}
-        </div>
-        ${addingTaskFor && addingTaskFor.categoryId === cat.id && addingTaskFor.subcatId === subcat.id
-          ? renderAddTaskForm(cat.id, subcat.id)
-          : `<button class="add-row-btn add-task-trigger" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">+ Add task</button>`}
+        ${expanded ? `
+          <div class="task-list">
+            ${sortedTasks(subcat).map(t => renderTaskRow(cat.id, subcat.id, t)).join('')}
+          </div>
+          ${addingTaskFor && addingTaskFor.categoryId === cat.id && addingTaskFor.subcatId === subcat.id
+            ? renderAddTaskForm(cat.id, subcat.id)
+            : `<button class="add-row-btn add-task-trigger" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">+ Add task</button>`}
+        ` : ''}
       </div>
     `;
   }
@@ -732,7 +743,8 @@
         const input = document.querySelector(`.new-subcat-name[data-cat-id="${btn.dataset.catId}"]`);
         const name = input.value.trim();
         if (!name) return;
-        await addSubcategory(btn.dataset.catId, name);
+        const newSubcatId = await addSubcategory(btn.dataset.catId, name);
+        expandedSubcats.add(newSubcatId);
         addingSubcatFor = null;
         renderCategories();
       });
@@ -740,7 +752,23 @@
 
     // Delete subcategory
     document.querySelectorAll('.delete-subcat-btn').forEach(btn => {
-      btn.addEventListener('click', () => deleteSubcategory(btn.dataset.catId, btn.dataset.subcatId));
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteSubcategory(btn.dataset.catId, btn.dataset.subcatId);
+      });
+    });
+
+    // Expand/collapse subcategory
+    document.querySelectorAll('.subcat-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const subcatId = header.dataset.subcatId;
+        if (expandedSubcats.has(subcatId)) {
+          expandedSubcats.delete(subcatId);
+        } else {
+          expandedSubcats.add(subcatId);
+        }
+        renderCategories();
+      });
     });
 
     // Add task trigger
