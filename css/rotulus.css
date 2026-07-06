@@ -1,0 +1,510 @@
+/* ==========================================================================
+   Rotulus design system
+   Shared across every page. Tokens first, then shared components.
+   Light theme is the default (:root); dark lives under :root.theme-dark.
+   The theme class is applied by the pre-paint snippet in each page's <head>
+   and toggled by js/rotulus-shared.js. localStorage key stays
+   'scrollswap_theme' with values 'light' / 'dark' — do not rename.
+   ========================================================================== */
+
+:root {
+  /* Surfaces & text */
+  --bg: #EDEBF7;
+  --card: #FFFFFF;
+  --line: #E5E1F4;
+  --ink: #2B2540;
+  --ink-dim: #8A84A3;
+
+  /* Brand */
+  --primary: #6C5CE7;
+  --primary-strong: #5A48D6;
+  --primary-soft: #EAE6FC;
+  --on-primary: #FFFFFF;
+  --green: #3EBE7E;
+  --danger: #F26D6D;
+
+  /* Gradients */
+  --grad-hero: linear-gradient(120deg, #7C4DFF, #B388FF);
+  --grad-today: linear-gradient(120deg, #6C5CE7, #4FA3F7);
+  --grad-timer: linear-gradient(160deg, #F3F0FF, #E7F0FF);
+
+  /* Accent set (slots + categories), each with a pastel tile tint */
+  --acc-orange: #F59E42;  --acc-orange-soft: #FDEBD7;
+  --acc-sky:    #4FA3F7;  --acc-sky-soft:    #DEEDFE;
+  --acc-purple: #9B6CF0;  --acc-purple-soft: #EDE4FD;
+  --acc-green:  #3EBE7E;  --acc-green-soft:  #DDF5E9;
+  --acc-pink:   #F272B0;  --acc-pink-soft:   #FDE2EF;
+  --acc-red:    #F26D6D;  --acc-red-soft:    #FDE3E3;
+  --acc-yellow: #F2B93C;  --acc-yellow-soft: #FCF0D6;
+
+  /* Shape & elevation */
+  --r-lg: 22px;
+  --r-md: 14px;
+  --r-sm: 10px;
+  --r-pill: 999px;
+  --shadow-card: 0 8px 24px rgba(88, 70, 190, 0.10);
+  --shadow-float: 0 12px 32px rgba(88, 70, 190, 0.16);
+
+  /* Motion */
+  --t-fast: 0.15s;
+  --t-med: 0.22s;
+  --ease: cubic-bezier(0.2, 0.8, 0.3, 1);
+
+  /* Type */
+  --font-display: 'Baloo 2', ui-rounded, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Nunito', -apple-system, 'Segoe UI', sans-serif;
+
+  /* --- Legacy aliases: old inline CSS/JS keeps working untouched --- */
+  --gold: var(--primary);
+  --sage: var(--green);
+  --card-line: var(--line);
+  --cat-productivity: var(--acc-green);
+  --cat-workout: var(--acc-red);
+  --cat-reading: var(--acc-yellow);
+  --rust: var(--acc-red);
+}
+
+:root.theme-dark {
+  --bg: #151020;
+  --card: #201A33;
+  --line: rgba(255, 255, 255, 0.10);
+  --ink: #EDE9FB;
+  --ink-dim: #9A93B8;
+
+  --primary: #8B7CF7;
+  --primary-strong: #7A68F0;
+  --primary-soft: rgba(124, 92, 255, 0.18);
+  --green: #4ED694;
+  --danger: #FF8585;
+
+  --grad-hero: linear-gradient(120deg, #5B46C9, #7E5FFF);
+  --grad-today: linear-gradient(120deg, #4C3DBE, #2F6ED9);
+  --grad-timer: linear-gradient(160deg, #241C42, #1B2340);
+
+  --acc-orange: #FFAE5C;  --acc-orange-soft: rgba(245, 158, 66, 0.16);
+  --acc-sky:    #6BB4FF;  --acc-sky-soft:    rgba(79, 163, 247, 0.16);
+  --acc-purple: #B08CFF;  --acc-purple-soft: rgba(155, 108, 240, 0.18);
+  --acc-green:  #4ED694;  --acc-green-soft:  rgba(62, 190, 126, 0.16);
+  --acc-pink:   #FF8AC2;  --acc-pink-soft:   rgba(242, 114, 176, 0.16);
+  --acc-red:    #FF8585;  --acc-red-soft:    rgba(242, 109, 109, 0.16);
+  --acc-yellow: #FFCB57;  --acc-yellow-soft: rgba(242, 185, 60, 0.16);
+
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* ==========================================================================
+   Base layout (was duplicated inline on every page)
+   ========================================================================== */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: max(28px, env(safe-area-inset-top));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Full-page blob artwork. The image sits on top of CSS gradient blobs, so
+   if /assets/bg-light.png or bg-dark.png is missing the gradients still
+   paint and the app looks finished. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--bg);
+  background-image:
+    url('/assets/bg-light.png'),
+    radial-gradient(620px 520px at 88% 10%, rgba(124, 92, 255, 0.20), transparent 70%),
+    radial-gradient(540px 480px at 6% 82%, rgba(245, 130, 90, 0.18), transparent 70%),
+    radial-gradient(440px 400px at 92% 88%, rgba(79, 163, 247, 0.16), transparent 70%),
+    radial-gradient(300px 280px at 12% 18%, rgba(242, 114, 176, 0.12), transparent 70%);
+  background-size: cover, auto, auto, auto, auto;
+  background-position: center, center, center, center, center;
+  background-repeat: no-repeat;
+}
+
+:root.theme-dark body::before {
+  background-image:
+    url('/assets/bg-dark.png'),
+    radial-gradient(620px 520px at 88% 10%, rgba(124, 92, 255, 0.28), transparent 70%),
+    radial-gradient(540px 480px at 6% 82%, rgba(242, 109, 109, 0.14), transparent 70%),
+    radial-gradient(440px 400px at 92% 88%, rgba(47, 110, 217, 0.20), transparent 70%),
+    radial-gradient(300px 280px at 12% 18%, rgba(242, 114, 176, 0.10), transparent 70%);
+}
+
+#app {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: transparent;
+  padding: 8px 22px 40px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   Motion defaults & press feedback
+   ========================================================================== */
+
+button {
+  font-family: var(--font-body);
+  touch-action: manipulation;
+  transition:
+    transform var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
+}
+button:active { transform: scale(0.96); }
+
+a { touch-action: manipulation; }
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ==========================================================================
+   Nav row: round floating menu + gear buttons, animated dropdowns
+   ========================================================================== */
+
+.nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.nav-btn, .gear-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  padding: 0;
+}
+.gear-btn { color: var(--ink-dim); }
+
+.nav-dropdown, .gear-dropdown {
+  position: absolute;
+  top: 50px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  z-index: 10;
+  box-shadow: var(--shadow-float);
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.98);
+  transform-origin: top;
+  pointer-events: none;
+  transition:
+    opacity var(--t-med) var(--ease),
+    transform var(--t-med) var(--ease),
+    visibility 0s linear var(--t-med);
+}
+.nav-dropdown { left: 0; min-width: 200px; }
+.gear-dropdown { right: 0; min-width: 220px; padding: 14px 16px; }
+
+.nav-dropdown.open, .gear-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  pointer-events: auto;
+  transition:
+    opacity var(--t-med) var(--ease),
+    transform var(--t-med) var(--ease);
+}
+
+.nav-link {
+  display: block;
+  padding: 12px 16px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink-dim);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.nav-link:last-child { border-bottom: none; }
+.nav-link.active { color: var(--primary); background: var(--primary-soft); }
+.nav-link.disabled { opacity: 0.4; pointer-events: none; }
+.nav-link:active { background: var(--primary-soft); }
+
+.gear-status {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.gear-email { font-family: var(--font-body); font-weight: 700; font-size: 14px; color: var(--ink); margin: 0 0 12px; }
+.gear-note { font-family: var(--font-body); font-size: 12.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
+.gear-settings-link {
+  display: block;
+  text-align: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  text-decoration: none;
+}
+
+/* ==========================================================================
+   Page header (+ optional illustration peeking behind the title)
+   ========================================================================== */
+
+.header { margin-bottom: 18px; position: relative; }
+
+.header-art {
+  position: absolute;
+  right: -10px;
+  top: -26px;
+  width: 150px;
+  height: auto;
+  z-index: -1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin: 0 0 4px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.subtitle {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  margin: 0;
+}
+
+/* ==========================================================================
+   Cards, buttons, pills
+   ========================================================================== */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.hero-card {
+  background: var(--grad-hero);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.today-card {
+  background: var(--grad-today);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.btn-pill {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--r-pill);
+  padding: 12px 18px;
+  cursor: pointer;
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--shadow-card);
+}
+.btn-pill:active { background: var(--primary-strong); }
+.btn-pill.ghost {
+  background: var(--card);
+  color: var(--primary);
+  border: 1px solid var(--line);
+}
+.btn-pill.green { background: var(--green); color: #FFFFFF; }
+
+/* Soft icon tile (slots, stat cards, categories). Placeholder glyph today;
+   swap point for future art: put <img src="/assets/icons/..."> inside. */
+.icon-tile {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  line-height: 1;
+}
+.icon-tile img { width: 26px; height: 26px; object-fit: contain; }
+
+/* ==========================================================================
+   Auth card (shared markup on every page)
+   ========================================================================== */
+
+.auth-card {
+  margin: 16px 0 20px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.auth-status {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-email {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+  margin: 2px 0 0;
+}
+
+.auth-btn {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 10px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.auth-btn:active { background: var(--primary-strong); }
+.auth-btn.secondary {
+  background: transparent;
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+}
+
+/* ==========================================================================
+   Theme toggle (settings page + gear dropdowns)
+   ========================================================================== */
+
+.theme-toggle-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.theme-btn {
+  flex: 1;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--bg);
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 9px 6px;
+  cursor: pointer;
+}
+.theme-btn.selected {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+/* ==========================================================================
+   Shared small text
+   ========================================================================== */
+
+.footer-note {
+  margin-top: 22px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink-dim);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.sync-note {
+  margin-top: 6px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-align: center;
+}

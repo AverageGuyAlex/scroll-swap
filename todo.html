@@ -3,160 +3,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>To-Do &middot; Scroll Swap</title>
+<title>To-Do &middot; Rotulus</title>
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="To-Do">
-<meta name="theme-color" content="#1C1F1D">
+<meta name="theme-color" content="#EDEBF7">
 
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Crect x='55' y='58' width='18' height='18' rx='4' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Cline x1='84' y1='67' x2='128' y2='67' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='55' y='90' width='18' height='18' rx='4' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Cline x1='84' y1='99' x2='128' y2='99' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='55' y='122' width='18' height='18' rx='4' fill='%237A9B7E'/%3E%3Cline x1='84' y1='131' x2='110' y2='131' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='55' y='58' width='18' height='18' rx='4' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Cline x1='84' y1='67' x2='128' y2='67' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='55' y='90' width='18' height='18' rx='4' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Cline x1='84' y1='99' x2='128' y2='99' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='55' y='122' width='18' height='18' rx='4' fill='%237A9B7E'/%3E%3Cline x1='84' y1='131' x2='110' y2='131' stroke='%237A9B7E' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" sizes="512x512" href="/assets/app-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%236C5CE7'/%3E%3Crect x='55' y='58' width='18' height='18' rx='5' fill='none' stroke='%23FFFFFF' stroke-width='6'/%3E%3Cline x1='84' y1='67' x2='128' y2='67' stroke='%23FFFFFF' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='55' y='90' width='18' height='18' rx='5' fill='none' stroke='%23FFFFFF' stroke-width='6'/%3E%3Cline x1='84' y1='99' x2='128' y2='99' stroke='%23FFFFFF' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='55' y='122' width='18' height='18' rx='5' fill='%23FFFFFF'/%3E%3Cline x1='84' y1='131' x2='110' y2='131' stroke='%23FFFFFF' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/rotulus.css?v=1">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script defer src="/js/rotulus-shared.js?v=1"></script>
 
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; min-height: 100dvh; }
-  body {
-    display: flex; align-items: flex-start; justify-content: center;
-    padding-top: max(28px, env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom);
-  }
-  :root {
-    --ink: #EDEAE2;
-    --ink-dim: #A8A296;
-    --bg: #1C1F1D;
-    --card: #242824;
-    --card-line: #34392F;
-    --gold: #C9A24B;
-    --sage: #7A9B7E;
-  }
-  :root.theme-light {
-    --ink: #2A2A26;
-    --ink-dim: #8A8478;
-    --bg: #F3F1EA;
-    --card: #FFFFFF;
-    --card-line: #DDD8CB;
-    --gold: #A97F2E;
-    --sage: #4F7A57;
-  }
-
-  #app {
-    font-family: Georgia, 'Iowan Old Style', serif; color: var(--ink); background: var(--bg);
-    padding: 8px 22px 40px; max-width: 480px; width: 100%; margin: 0 auto;
-  }
-
-  /* Nav */
-  .nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; position: relative; }
-  .nav-btn {
-    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
-    background: var(--card); color: var(--ink); border: 1px solid var(--card-line); border-radius: 7px;
-    padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
-  }
-  .nav-dropdown {
-    position: absolute; top: 42px; left: 0; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 190px; display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  }
-  .nav-dropdown.open { display: block; }
-  .nav-link {
-    display: block; padding: 12px 16px; font-family: 'Courier New', monospace; font-size: 12.5px;
-    color: var(--ink-dim); text-decoration: none; border-bottom: 1px solid var(--card-line);
-  }
-  .nav-link:last-child { border-bottom: none; }
-  .nav-link.active { color: var(--gold); }
-
-  .gear-btn {
-    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
-    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
-  }
-  .gear-dropdown {
-    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
-  }
-  .gear-dropdown.open { display: block; }
-  .gear-status {
-    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px;
-    text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
-  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
-  .theme-toggle-row {
-    display: flex; gap: 6px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--card-line);
-  }
-  .theme-btn {
-    flex: 1; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase;
-    background: var(--bg); color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 6px;
-    padding: 8px 6px; cursor: pointer;
-  }
-  .theme-btn.selected { background: var(--gold); color: var(--card); border-color: var(--gold); font-weight: 600; }
-  .gear-settings-link {
-    display: block; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-line);
-    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
-  }
-
-  .header { margin-bottom: 18px; }
-  .eyebrow { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
-  .title { font-size: 26px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .subtitle { font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink-dim); margin: 0; }
-
-  .auth-card {
-    margin: 16px 0 20px; padding: 14px 16px; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-  }
-  .auth-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
-  .auth-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 2px 0 0; }
-  .auth-btn {
-    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
-    background: var(--gold); color: var(--bg); border: none; border-radius: 6px; padding: 9px 14px;
-    cursor: pointer; font-weight: 600; white-space: nowrap;
-  }
-  .auth-btn.secondary { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+  /* Page-specific: to-do */
 
   /* Add category */
   .add-cat-btn {
-    width: 100%; font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
-    background: var(--card); color: var(--ink-dim); border: 1px dashed var(--card-line); border-radius: 10px;
-    padding: 14px; cursor: pointer; margin-bottom: 16px;
+    width: 100%;
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--card);
+    color: var(--primary);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    padding: 14px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-card);
   }
   .inline-form {
-    background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 14px; margin-bottom: 16px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; margin-bottom: 16px;
     display: flex; flex-direction: column; gap: 10px;
   }
   .inline-input {
-    width: 100%; font-family: Georgia, serif; font-size: 15px; color: var(--ink); background: var(--bg);
-    border: 1px solid var(--card-line); border-radius: 8px; padding: 10px 12px;
+    width: 100%; font-family: var(--font-body); font-weight: 600; font-size: 14px; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px;
   }
   .inline-row { display: flex; gap: 8px; align-items: center; }
   .inline-btn {
-    font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
-    border: none; border-radius: 7px; padding: 9px 14px; cursor: pointer; font-weight: 600;
+    font-family: var(--font-body); font-weight: 800; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+    border: none; border-radius: var(--r-pill); padding: 10px 14px; cursor: pointer;
   }
-  .inline-btn.confirm { background: var(--sage); color: var(--bg); flex: 1; }
-  .inline-btn.cancel { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+  .inline-btn.confirm { background: var(--green); color: #FFFFFF; flex: 1; }
+  .inline-btn.cancel { background: transparent; color: var(--ink-dim); border: 1px solid var(--line); }
   .color-swatch-input {
-    -webkit-appearance: none; appearance: none; width: 38px; height: 38px; border: none; border-radius: 8px;
+    -webkit-appearance: none; appearance: none; width: 38px; height: 38px; border: none; border-radius: var(--r-sm);
     padding: 0; cursor: pointer; background: transparent;
   }
   .color-swatch-input::-webkit-color-swatch-wrapper { padding: 0; }
-  .color-swatch-input::-webkit-color-swatch { border: 1px solid var(--card-line); border-radius: 8px; }
+  .color-swatch-input::-webkit-color-swatch { border: 1px solid var(--line); border-radius: var(--r-sm); }
 
   /* Category card */
-  .cat-card { border-radius: 12px; margin-bottom: 14px; overflow: hidden; border: 1px solid var(--card-line); }
+  .cat-card {
+    border-radius: var(--r-lg); margin-bottom: 14px; overflow: hidden;
+    border: 1px solid var(--line); box-shadow: var(--shadow-card);
+  }
   .cat-header {
     display: flex; align-items: center; gap: 10px; padding: 14px 14px; background: var(--card); cursor: pointer;
   }
-  .cat-color-dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.15); }
-  .cat-name { font-size: 17px; font-weight: 600; flex: 1; }
+  .cat-name { font-family: var(--font-body); font-weight: 800; font-size: 15.5px; flex: 1; }
   .cat-name.complete { text-decoration: line-through; color: var(--ink-dim); }
-  .cat-check { font-size: 13px; }
+  .cat-check { font-size: 13px; color: var(--green); }
   .task-counter {
-    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim);
-    background: var(--bg); border: 1px solid var(--card-line); border-radius: 6px; padding: 3px 7px; flex-shrink: 0;
+    font-family: var(--font-body); font-weight: 800; font-size: 10.5px; color: var(--ink-dim);
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0;
   }
-  .task-counter.complete { color: var(--sage); border-color: var(--sage); }
+  .task-counter.complete { color: var(--green); border-color: var(--green); }
   .cat-actions { display: flex; gap: 6px; align-items: center; }
   .icon-btn {
     background: transparent; border: none; color: var(--ink-dim); cursor: pointer; font-size: 15px; padding: 4px 6px;
@@ -168,93 +93,95 @@
   .subcat-header { display: flex; align-items: center; gap: 8px; padding: 8px 4px; cursor: pointer; }
   .subcat-chevron {
     display: inline-block; font-size: 11px; color: var(--ink-dim); flex-shrink: 0;
-    transition: transform 0.15s ease; transform: rotate(0deg);
+    transition: transform var(--t-med) var(--ease); transform: rotate(0deg);
   }
   .subcat-chevron.open { transform: rotate(90deg); }
-  .subcat-name { font-size: 14.5px; font-weight: 600; flex: 1; color: var(--ink); }
+  .subcat-name { font-weight: 700; font-size: 14px; flex: 1; color: var(--ink); }
   .subcat-name.complete { text-decoration: line-through; color: var(--ink-dim); }
-  .subcat-check { font-size: 12px; }
+  .subcat-check { font-size: 12px; color: var(--green); }
 
   /* Task row */
   .task-row {
-    display: flex; align-items: center; gap: 10px; padding: 8px 4px 8px 14px; border-bottom: 1px solid var(--card-line);
+    display: flex; align-items: center; gap: 10px; padding: 8px 4px 8px 14px; border-bottom: 1px solid var(--line);
   }
   .task-row:last-child { border-bottom: none; }
   .task-box {
-    width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--ink-dim); flex-shrink: 0;
+    width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--ink-dim); flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
   }
-  .task-box.checked { background: var(--sage); border-color: var(--sage); }
-  .task-box svg { opacity: 0; }
-  .task-box.checked svg { opacity: 1; }
-  .task-text { flex: 1; font-size: 15px; cursor: pointer; }
+  .task-box.checked { background: var(--green); border-color: var(--green); }
+  .task-box svg { opacity: 0; transform: scale(0.6); transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+  .task-box.checked svg { opacity: 1; transform: scale(1); }
+  .task-text { flex: 1; font-weight: 600; font-size: 14px; cursor: pointer; }
   .task-text.checked { color: var(--ink-dim); text-decoration: line-through; }
   .task-badge {
-    font-family: 'Courier New', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em;
-    color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 4px; padding: 2px 5px; flex-shrink: 0;
+    font-family: var(--font-body); font-weight: 800; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-dim); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 2px 7px; flex-shrink: 0;
   }
-  .task-badge.overdue { color: #E07A5F; border-color: #E07A5F; }
+  .task-badge.overdue { color: var(--danger); border-color: var(--danger); }
 
   .cat-due-btn {
-    font-family: 'Courier New', monospace; font-size: 10px; color: var(--ink-dim);
-    border: 1px solid var(--card-line); border-radius: 6px; padding: 5px 8px; cursor: pointer;
+    font-family: var(--font-body); font-weight: 700; font-size: 10px; color: var(--ink-dim);
+    border: 1px solid var(--line); border-radius: var(--r-pill); padding: 5px 10px; cursor: pointer;
     background: transparent; white-space: nowrap;
   }
-  .cat-due-btn.overdue { color: #E07A5F; border-color: #E07A5F; }
+  .cat-due-btn.overdue { color: var(--danger); border-color: var(--danger); }
   .task-due-btn {
-    font-family: 'Courier New', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em;
-    color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 5px; padding: 3px 7px;
+    font-family: var(--font-body); font-weight: 800; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--ink-dim); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px 8px;
     cursor: pointer; background: transparent; flex-shrink: 0; white-space: nowrap;
   }
-  .task-due-btn.overdue { color: #E07A5F; border-color: #E07A5F; }
+  .task-due-btn.overdue { color: var(--danger); border-color: var(--danger); }
   .due-date-editor {
-    background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 12px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px;
     margin-bottom: 10px; display: flex; flex-direction: column; gap: 10px;
   }
 
   .add-row-btn {
-    background: transparent; border: none; color: var(--ink-dim); font-family: 'Courier New', monospace;
-    font-size: 11.5px; text-decoration: underline; cursor: pointer; padding: 8px 4px;
+    background: transparent; border: none; color: var(--primary); font-family: var(--font-body); font-weight: 700;
+    font-size: 12px; cursor: pointer; padding: 8px 4px;
   }
 
   .empty-note {
-    font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink-dim); text-align: center; padding: 20px 0;
+    font-weight: 600; font-size: 12.5px; color: var(--ink-dim); text-align: center; padding: 20px 0;
   }
 
   .archive-toggle-row { text-align: center; margin-top: 20px; }
   .archive-toggle-btn {
-    font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
-    background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 7px;
-    padding: 9px 16px; cursor: pointer;
+    font-family: var(--font-body); font-weight: 800; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--card); color: var(--primary); border: 1px solid var(--line); border-radius: var(--r-pill);
+    padding: 10px 20px; cursor: pointer; box-shadow: var(--shadow-card);
   }
   .archive-panel { display: none; margin-top: 16px; }
   .archive-panel.open { display: block; }
   .archive-date-card {
-    background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; margin-bottom: 10px; overflow: hidden;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); margin-bottom: 10px; overflow: hidden;
+    box-shadow: var(--shadow-card);
   }
   .archive-date-header {
     padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
-    font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink);
+    font-weight: 700; font-size: 12.5px; color: var(--ink);
   }
   .archive-date-count { font-size: 11px; color: var(--ink-dim); }
   .archive-date-body { padding: 0 14px 12px; display: none; }
   .archive-date-body.open { display: block; }
   .archive-item {
-    font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--card-line); color: var(--ink-dim);
+    font-weight: 600; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--ink-dim);
   }
   .archive-item:last-child { border-bottom: none; }
-  .archive-item-path { font-family: 'Courier New', monospace; font-size: 10px; color: var(--ink-dim); display: block; margin-top: 2px; }
-  .archive-empty { font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink-dim); text-align: center; padding: 16px 0; }
+  .archive-item-path { font-weight: 700; font-size: 10px; color: var(--ink-dim); display: block; margin-top: 2px; }
+  .archive-empty { font-weight: 600; font-size: 12.5px; color: var(--ink-dim); text-align: center; padding: 16px 0; }
 
-  .sync-note { margin-top: 16px; font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim); text-align: center; }
+  .sync-note { margin-top: 16px; }
 </style>
 </head>
 <body>
 <div id="app">
   <div class="nav-row">
-    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <button class="nav-btn" id="navToggle" aria-label="Menu">&#9776;</button>
     <div class="nav-dropdown" id="navDropdown">
-      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="index.html" class="nav-link">Rotulus</a>
       <a href="dashboard.html" class="nav-link">Dashboard</a>
       <a href="goals.html" class="nav-link">Goals</a>
       <a href="lock-in.html" class="nav-link">Lock In</a>
@@ -263,7 +190,7 @@
       <a href="todo.html" class="nav-link active">To-Do</a>
       <a href="settings.html" class="nav-link">Settings</a>
     </div>
-    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <button class="gear-btn" id="gearToggle" title="Settings" aria-label="Settings">&#9881;</button>
     <div class="gear-dropdown" id="gearDropdown">
       <div id="gearAccountSection"></div>
       <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
@@ -271,6 +198,7 @@
   </div>
 
   <div class="header">
+    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
     <p class="eyebrow">Tasks</p>
     <h1 class="title">To-Do</h1>
     <p class="subtitle">Categories, subcategories, and tasks &mdash; recurring or one-time.</p>
@@ -368,8 +296,8 @@
   function renderSyncNote() {
     const el = document.getElementById('syncNote');
     if (!el) return;
-    if (!currentUser) el.textContent = 'Not synced \u2014 log in to save across devices';
-    else if (syncing) el.textContent = 'Syncing\u2026';
+    if (!currentUser) el.textContent = 'Not synced — log in to save across devices';
+    else if (syncing) el.textContent = 'Syncing…';
     else el.textContent = 'Synced to your account';
   }
 
@@ -401,8 +329,10 @@
         delete task.completedDate;
       }
     }
-    await persist();
+    // Update the UI immediately; the save/sync runs in the background so a
+    // tap never waits on the network round-trip.
     renderCategories();
+    persist();
   }
 
   function isSubcatComplete(subcat) {
@@ -500,7 +430,7 @@
   }
 
   function checkmarkSVG() {
-    return '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#1C1F1D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
   function formatShortDate(dateStr) {
@@ -541,10 +471,10 @@
     area.innerHTML = `
       <div class="inline-form">
         <div class="inline-row">
-          <input type="color" class="color-swatch-input" id="newCatColor" value="#C9A24B">
+          <input type="color" class="color-swatch-input" id="newCatColor" value="#6C5CE7">
           <input type="text" class="inline-input" id="newCatName" placeholder="Category name (e.g. School)" style="flex:1;">
         </div>
-        <label style="display:flex; align-items:center; gap:8px; font-family:'Courier New', monospace; font-size:12px; color:var(--ink-dim);">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; color:var(--ink-dim);">
           Due date (optional)
           <input type="date" class="inline-input" id="newCatDueDate" style="width:auto; padding:6px 8px;">
         </label>
@@ -698,7 +628,7 @@
     return `
       <div class="inline-form" style="margin-top:6px; margin-bottom:8px;">
         <input type="text" class="inline-input new-task-text" data-cat-id="${catId}" data-subcat-id="${subcatId}" placeholder="Task (e.g. Complete page 54)">
-        <label style="display:flex; align-items:center; gap:8px; font-family:'Courier New', monospace; font-size:12px; color:var(--ink-dim);">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; color:var(--ink-dim);">
           <input type="checkbox" class="new-task-recurring" data-cat-id="${catId}" data-subcat-id="${subcatId}">
           Recurring (resets daily)
         </label>
@@ -913,54 +843,6 @@
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
 
-  // ---- Theme ----
-
-  function applyTheme(theme) {
-    document.documentElement.classList.toggle('theme-light', theme === 'light');
-    document.querySelectorAll('.theme-btn').forEach(b => {
-      b.classList.toggle('selected', b.dataset.theme === theme);
-    });
-  }
-
-  function initTheme() {
-    let saved = 'dark';
-    try {
-      saved = localStorage.getItem('scrollswap_theme') || 'dark';
-    } catch (e) {}
-    applyTheme(saved);
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const theme = btn.dataset.theme;
-        applyTheme(theme);
-        try { localStorage.setItem('scrollswap_theme', theme); } catch (e) {}
-      });
-    });
-  }
-
-  // ---- Nav dropdown ----
-
-  function initNav() {
-    const toggle = document.getElementById('navToggle');
-    const dropdown = document.getElementById('navDropdown');
-    const gearToggle = document.getElementById('gearToggle');
-    const gearDropdown = document.getElementById('gearDropdown');
-
-    toggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      gearDropdown.classList.remove('open');
-      dropdown.classList.toggle('open');
-    });
-    gearToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.remove('open');
-      gearDropdown.classList.toggle('open');
-    });
-    document.addEventListener('click', () => {
-      dropdown.classList.remove('open');
-      gearDropdown.classList.remove('open');
-    });
-  }
-
   // ---- Archive ----
 
   let archiveOpen = false;
@@ -1058,12 +940,11 @@
   }
 
   // ---- Init ----
+  // Theme + nav dropdown behavior now lives in /js/rotulus-shared.js.
 
   function initApp() {
-    initTheme();
     document.getElementById('categoriesList').innerHTML = '<p class="empty-note">Loading your tasks&hellip;</p>';
     renderAddCategoryArea();
-    initNav();
     initArchiveToggle();
   }
 

@@ -3,221 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Pomodoro &middot; Scroll Swap</title>
+<title>Pomodoro &middot; Rotulus</title>
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Pomodoro">
-<meta name="theme-color" content="#1C1F1D">
+<meta name="theme-color" content="#EDEBF7">
 
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Ccircle cx='90' cy='95' r='38' fill='none' stroke='%237A9B7E' stroke-width='10'/%3E%3Cline x1='90' y1='95' x2='90' y2='68' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='90' y1='95' x2='110' y2='95' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Ccircle cx='90' cy='95' r='38' fill='none' stroke='%237A9B7E' stroke-width='10'/%3E%3Cline x1='90' y1='95' x2='90' y2='68' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='90' y1='95' x2='110' y2='95' stroke='%237A9B7E' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" sizes="512x512" href="/assets/app-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%236C5CE7'/%3E%3Ccircle cx='90' cy='95' r='38' fill='none' stroke='%23FFFFFF' stroke-width='10'/%3E%3Cline x1='90' y1='95' x2='90' y2='68' stroke='%23FFFFFF' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='90' y1='95' x2='110' y2='95' stroke='%23FFFFFF' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/rotulus.css?v=1">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script defer src="/js/rotulus-shared.js?v=1"></script>
 
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: var(--bg);
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
-  body {
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: max(28px, env(safe-area-inset-top));
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  :root {
-    --ink: #EDEAE2;
-    --ink-dim: #A8A296;
-    --bg: #1C1F1D;
-    --card: #242824;
-    --card-line: #34392F;
-    --gold: #C9A24B;
-    --sage: #7A9B7E;
-    --rust: #B5654A;
-    --cat-productivity: #6FA37A;
-    --cat-workout: #C1503F;
-    --cat-reading: #D9B54A;
-  }
-  :root.theme-light {
-    --ink: #2A2A26;
-    --ink-dim: #8A8478;
-    --bg: #F3F1EA;
-    --card: #FFFFFF;
-    --card-line: #DDD8CB;
-    --gold: #A97F2E;
-    --sage: #4F7A57;
-    --rust: #A8503A;
-    --cat-productivity: #4F7A57;
-    --cat-workout: #A8402F;
-    --cat-reading: #A98A2E;
-  }
+  /* Page-specific: pomodoro */
 
-  #app {
-    font-family: Georgia, 'Iowan Old Style', serif;
-    color: var(--ink);
-    background: var(--bg);
-    padding: 8px 22px 40px;
-    max-width: 480px;
-    width: 100%;
-    margin: 0 auto;
-  }
-
-  /* Nav */
-  .nav-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-    position: relative;
-  }
-  .nav-btn {
-    font-family: 'Courier New', monospace;
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    background: var(--card);
-    color: var(--ink);
-    border: 1px solid var(--card-line);
-    border-radius: 7px;
-    padding: 9px 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .nav-dropdown {
-    position: absolute;
-    top: 42px;
-    left: 0;
-    background: var(--card);
-    border: 1px solid var(--card-line);
-    border-radius: 10px;
-    overflow: hidden;
-    z-index: 10;
-    min-width: 190px;
-    display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  }
-  .nav-dropdown.open { display: block; }
-  .nav-link {
-    display: block;
-    padding: 12px 16px;
-    font-family: 'Courier New', monospace;
-    font-size: 12.5px;
-    color: var(--ink-dim);
-    text-decoration: none;
-    border-bottom: 1px solid var(--card-line);
-  }
-  .nav-link:last-child { border-bottom: none; }
-  .nav-link.active { color: var(--gold); }
-
-  .gear-btn {
-    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
-    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
-  }
-  .gear-dropdown {
-    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
-  }
-  .gear-dropdown.open { display: block; }
-  .gear-status {
-    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px;
-    text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
-  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
-  .theme-toggle-row {
-    display: flex; gap: 6px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--card-line);
-  }
-  .theme-btn {
-    flex: 1; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase;
-    background: var(--bg); color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 6px;
-    padding: 8px 6px; cursor: pointer;
-  }
-  .theme-btn.selected { background: var(--gold); color: var(--card); border-color: var(--gold); font-weight: 600; }
-  .gear-settings-link {
-    display: block; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-line);
-    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
-  }
-  .nav-link.disabled { opacity: 0.4; pointer-events: none; }
-
-  .header { margin-bottom: 18px; }
-  .eyebrow {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin: 0 0 6px;
-  }
-  .title {
-    font-size: 26px;
-    font-weight: 600;
-    margin: 0 0 4px;
-    letter-spacing: -0.01em;
-  }
-  .subtitle {
-    font-family: 'Courier New', monospace;
-    font-size: 12.5px;
-    color: var(--ink-dim);
-    margin: 0;
-  }
-
-  .auth-card {
-    margin: 16px 0 20px;
-    padding: 14px 16px;
-    background: var(--card);
-    border: 1px solid var(--card-line);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .auth-status {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    color: var(--ink-dim);
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .auth-email {
-    font-family: Georgia, serif;
-    font-size: 14.5px;
-    color: var(--ink);
-    margin: 2px 0 0;
-  }
-  .auth-btn {
-    font-family: 'Courier New', monospace;
-    font-size: 11.5px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    background: var(--gold);
-    color: var(--bg);
-    border: none;
-    border-radius: 6px;
-    padding: 9px 14px;
-    cursor: pointer;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .auth-btn.secondary {
-    background: transparent;
-    color: var(--ink-dim);
-    border: 1px solid var(--card-line);
-  }
-
-  /* Category picker */
+  /* Category picker pills */
   .category-row {
     display: flex;
     gap: 8px;
@@ -225,52 +35,63 @@
   }
   .cat-btn {
     flex: 1;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     background: var(--card);
     color: var(--ink-dim);
-    border: 1px solid var(--card-line);
-    border-radius: 8px;
-    padding: 12px 6px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    padding: 11px 6px;
     cursor: pointer;
     text-align: center;
     line-height: 1.3;
+    box-shadow: var(--shadow-card);
   }
   .cat-btn.selected {
-    background: var(--sage);
-    color: var(--bg);
-    border-color: var(--sage);
-    font-weight: 600;
+    color: #FFFFFF;
+    border-color: transparent;
   }
+  .cat-btn.selected .cat-dot { background: #FFFFFF !important; }
 
-  /* Timer */
+  /* Timer card */
   .timer-card {
-    background: var(--card);
-    border: 1px solid var(--card-line);
-    border-radius: 14px;
-    padding: 28px 20px;
+    background: var(--grad-timer);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-float);
+    padding: 26px 20px;
     text-align: center;
     margin-bottom: 20px;
   }
+  .timer-cat-label {
+    display: inline-block;
+    font-weight: 800;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #FFFFFF;
+    background: var(--primary);
+    border-radius: var(--r-pill);
+    padding: 6px 14px;
+    margin: 0 0 14px;
+    min-height: 14px;
+  }
   .timer-display {
-    font-family: Georgia, serif;
-    font-size: 56px;
+    font-family: var(--font-display);
+    font-size: 64px;
     font-weight: 700;
     color: var(--ink);
-    letter-spacing: 0.02em;
-    margin: 0 0 6px;
+    letter-spacing: 0.01em;
+    margin: 0 0 8px;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
-  }
-  .timer-cat-label {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--gold);
-    margin: 0 0 18px;
-    min-height: 14px;
   }
   .duration-row {
     display: flex;
@@ -280,20 +101,22 @@
     margin-bottom: 20px;
   }
   .duration-label {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
+    font-weight: 800;
+    font-size: 10.5px;
     color: var(--ink-dim);
     text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
   .duration-input {
-    width: 60px;
-    font-family: 'Courier New', monospace;
+    width: 64px;
+    font-family: var(--font-body);
+    font-weight: 700;
     font-size: 14px;
-    background: var(--bg);
+    background: var(--card);
     color: var(--ink);
-    border: 1px solid var(--card-line);
-    border-radius: 6px;
-    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: 7px 8px;
     text-align: center;
   }
   .timer-controls {
@@ -302,36 +125,44 @@
     justify-content: center;
   }
   .timer-btn {
-    font-family: 'Courier New', monospace;
-    font-size: 12.5px;
-    letter-spacing: 0.04em;
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     border: none;
-    border-radius: 8px;
-    padding: 12px 18px;
+    border-radius: var(--r-pill);
+    padding: 12px 20px;
     cursor: pointer;
-    font-weight: 600;
+    box-shadow: var(--shadow-card);
   }
-  .timer-btn.start { background: var(--sage); color: var(--bg); }
-  .timer-btn.pause { background: var(--gold); color: var(--bg); }
-  .timer-btn.reset { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
+  .timer-btn.start { background: var(--green); color: #FFFFFF; }
+  .timer-btn.pause { background: var(--primary); color: var(--on-primary); }
+  .timer-btn.reset { background: var(--card); color: var(--ink-dim); border: 1px solid var(--line); }
   .timer-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
   /* Totals */
   .totals-title {
-    font-family: 'Courier New', monospace;
+    font-weight: 800;
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-dim);
+    letter-spacing: 0.1em;
+    color: var(--primary);
     margin: 0 0 10px;
+  }
+  #totalsList {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    padding: 4px 16px;
   }
   .total-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 4px;
-    border-bottom: 1px solid var(--card-line);
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
   }
   .total-row:last-child { border-bottom: none; }
   .total-name-wrap { display: flex; align-items: center; gap: 10px; }
@@ -341,11 +172,8 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .total-name { font-size: 15.5px; }
-  .total-mins {
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-  }
+  .total-name { font-weight: 700; font-size: 14px; }
+  .total-mins { font-weight: 800; font-size: 12.5px; }
 
   /* Chart toggle + pie chart */
   .chart-toggle-row {
@@ -353,42 +181,45 @@
     margin-top: 16px;
   }
   .chart-toggle-btn {
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-body);
+    font-weight: 800;
     font-size: 11px;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    background: transparent;
-    color: var(--ink-dim);
-    border: 1px solid var(--card-line);
-    border-radius: 7px;
-    padding: 9px 16px;
+    background: var(--card);
+    color: var(--primary);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    padding: 10px 20px;
     cursor: pointer;
+    box-shadow: var(--shadow-card);
   }
   .range-toggle-row {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     margin-bottom: 18px;
     width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    padding: 4px;
   }
   .range-btn {
     flex: 1;
-    font-family: 'Courier New', monospace;
-    font-size: 10.5px;
-    letter-spacing: 0.03em;
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 10px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    background: var(--bg);
+    background: transparent;
     color: var(--ink-dim);
-    border: 1px solid var(--card-line);
-    border-radius: 7px;
+    border: none;
+    border-radius: var(--r-pill);
     padding: 8px 6px;
     cursor: pointer;
   }
-  .range-btn.selected {
-    background: var(--gold);
-    color: var(--bg);
-    border-color: var(--gold);
-    font-weight: 600;
-  }
+  .range-btn.selected { background: var(--primary); color: var(--on-primary); }
+
   .chart-wrap {
     display: none;
     flex-direction: column;
@@ -396,54 +227,54 @@
     margin-top: 20px;
     padding: 20px;
     background: var(--card);
-    border: 1px solid var(--card-line);
-    border-radius: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
   }
   .chart-wrap.open { display: flex; }
-  .pie {
-    width: 160px;
-    height: 160px;
+  .pie-wrap { position: relative; width: 156px; height: 156px; margin-bottom: 16px; }
+  .pie { width: 100%; height: 100%; border-radius: 50%; }
+  .pie.empty { background: var(--line) !important; }
+  .pie-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 62px; height: 62px;
     border-radius: 50%;
-    margin-bottom: 16px;
+    background: var(--card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: var(--shadow-card);
   }
-  .pie.empty {
-    background: var(--card-line) !important;
-  }
-  .chart-legend {
-    width: 100%;
-  }
+  .chart-legend { width: 100%; }
   .legend-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 6px 4px;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-weight: 700;
+    font-size: 12.5px;
   }
   .legend-name { display: flex; align-items: center; gap: 8px; color: var(--ink); }
   .legend-pct { color: var(--ink-dim); }
   .chart-empty-note {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
+    font-weight: 600;
+    font-size: 12px;
     color: var(--ink-dim);
     text-align: center;
   }
 
-  .sync-note {
-    margin-top: 16px;
-    font-family: 'Courier New', monospace;
-    font-size: 10.5px;
-    color: var(--ink-dim);
-    text-align: center;
-  }
+  .sync-note { margin-top: 16px; }
 </style>
 </head>
 <body>
 <div id="app">
   <div class="nav-row">
-    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <button class="nav-btn" id="navToggle" aria-label="Menu">&#9776;</button>
     <div class="nav-dropdown" id="navDropdown">
-      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="index.html" class="nav-link">Rotulus</a>
       <a href="dashboard.html" class="nav-link">Dashboard</a>
       <a href="goals.html" class="nav-link">Goals</a>
       <a href="lock-in.html" class="nav-link">Lock In</a>
@@ -452,7 +283,7 @@
       <a href="todo.html" class="nav-link">To-Do</a>
       <a href="settings.html" class="nav-link">Settings</a>
     </div>
-    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <button class="gear-btn" id="gearToggle" title="Settings" aria-label="Settings">&#9881;</button>
     <div class="gear-dropdown" id="gearDropdown">
       <div id="gearAccountSection"></div>
       <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
@@ -460,6 +291,7 @@
   </div>
 
   <div class="header">
+    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
     <p class="eyebrow">Focus session</p>
     <h1 class="title">Pomodoro</h1>
     <p class="subtitle">Pick a category, run the clock, log the time.</p>
@@ -497,7 +329,10 @@
       <button class="range-btn" data-range="7">Last 7 days</button>
       <button class="range-btn" data-range="30">Last 30 days</button>
     </div>
-    <div class="pie" id="pieCircle"></div>
+    <div class="pie-wrap">
+      <div class="pie" id="pieCircle"></div>
+      <div class="pie-center">&#9201;</div>
+    </div>
     <div class="chart-legend" id="chartLegend"></div>
   </div>
 
@@ -632,8 +467,8 @@
   function renderSyncNote() {
     const el = document.getElementById('syncNote');
     if (!el) return;
-    if (!currentUser) el.textContent = 'Not synced \u2014 log in to save across devices';
-    else if (syncing) el.textContent = 'Syncing\u2026';
+    if (!currentUser) el.textContent = 'Not synced — log in to save across devices';
+    else if (syncing) el.textContent = 'Syncing…';
     else el.textContent = 'Synced to your account';
   }
 
@@ -653,7 +488,7 @@
     const row = document.getElementById('categoryRow');
     row.innerHTML = CATEGORIES.map(c => `
       <button class="cat-btn ${c.id === selectedCategory ? 'selected' : ''}" data-id="${c.id}"
-        style="${c.id === selectedCategory ? `background:${c.color}; border-color:${c.color};` : ''}">${c.label}</button>
+        style="${c.id === selectedCategory ? `background:${c.color};` : ''}"><span class="cat-dot" style="background:${c.color}"></span>${c.label}</button>
     `).join('');
     row.querySelectorAll('.cat-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -672,7 +507,7 @@
     const cat = CATEGORIES.find(c => c.id === selectedCategory);
     const label = document.getElementById('timerCatLabel');
     label.textContent = cat ? cat.label : '';
-    label.style.color = cat ? cat.color : '';
+    label.style.background = cat ? cat.color : '';
   }
 
   // ---- Timer logic ----
@@ -983,59 +818,10 @@
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
 
-  // ---- Theme ----
-
-  function applyTheme(theme) {
-    document.documentElement.classList.toggle('theme-light', theme === 'light');
-    document.querySelectorAll('.theme-btn').forEach(b => {
-      b.classList.toggle('selected', b.dataset.theme === theme);
-    });
-  }
-
-  function initTheme() {
-    let saved = 'dark';
-    try {
-      saved = localStorage.getItem('scrollswap_theme') || 'dark';
-    } catch (e) {}
-    applyTheme(saved);
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const theme = btn.dataset.theme;
-        applyTheme(theme);
-        try { localStorage.setItem('scrollswap_theme', theme); } catch (e) {}
-      });
-    });
-  }
-
-  // ---- Nav dropdown ----
-
-  function initNav() {
-    const toggle = document.getElementById('navToggle');
-    const dropdown = document.getElementById('navDropdown');
-    const gearToggle = document.getElementById('gearToggle');
-    const gearDropdown = document.getElementById('gearDropdown');
-
-    toggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      gearDropdown.classList.remove('open');
-      dropdown.classList.toggle('open');
-    });
-    gearToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.remove('open');
-      gearDropdown.classList.toggle('open');
-    });
-    document.addEventListener('click', () => {
-      dropdown.classList.remove('open');
-      gearDropdown.classList.remove('open');
-    });
-  }
-
   // ---- Init ----
+  // Theme + nav dropdown behavior now lives in /js/rotulus-shared.js.
 
   function initApp() {
-    initTheme();
-    initNav();
     initChartToggle();
 
     document.getElementById('startBtn').addEventListener('click', startTimer);

@@ -3,323 +3,260 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Scroll Swap</title>
+<title>Rotulus</title>
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Scroll Swap">
-<meta name="theme-color" content="#1C1F1D">
+<meta name="apple-mobile-web-app-title" content="Rotulus">
+<meta name="theme-color" content="#EDEBF7">
 
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Cpath d='M48 92L78 124L132 56' fill='none' stroke='%237A9B7E' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Cpath d='M48 92L78 124L132 56' fill='none' stroke='%237A9B7E' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" sizes="512x512" href="/assets/app-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%236C5CE7'/%3E%3Cpath d='M48 92L78 124L132 56' fill='none' stroke='%23FFFFFF' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/rotulus.css?v=1">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script defer src="/js/rotulus-shared.js?v=1"></script>
 
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: var(--bg);
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
-  body {
+  /* Page-specific: habit tracker */
+  .header { text-align: center; padding-top: 6px; }
+  .subtitle .hl { color: var(--primary); font-weight: 800; }
+
+  /* Streak hero banner */
+  .streak-banner {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    margin: 4px 0 20px;
+  }
+  .streak-ring {
+    flex-shrink: 0;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: conic-gradient(rgba(255,255,255,0.95) calc(var(--ring, 0) * 1%), rgba(255,255,255,0.25) 0);
+    display: flex;
+    align-items: center;
     justify-content: center;
-    padding-top: max(28px, env(safe-area-inset-top));
-    padding-bottom: env(safe-area-inset-bottom);
   }
-  :root {
-    --ink: #EDEAE2;
-    --ink-dim: #A8A296;
-    --bg: #1C1F1D;
-    --card: #242824;
-    --card-line: #34392F;
-    --gold: #C9A24B;
-    --sage: #7A9B7E;
-  }
-  :root.theme-light {
-    --ink: #2A2A26;
-    --ink-dim: #8A8478;
-    --bg: #F3F1EA;
-    --card: #FFFFFF;
-    --card-line: #DDD8CB;
-    --gold: #A97F2E;
-    --sage: #4F7A57;
-  }
-
-  #app {
-    font-family: Georgia, 'Iowan Old Style', serif;
-    color: var(--ink);
-    background: var(--bg);
-    padding: 8px 22px 40px;
-    max-width: 480px;
-    width: 100%;
-    margin: 0 auto;
-  }
-
-  .nav-row {
+  .streak-ring-inner {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(70, 45, 180, 0.55);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-    position: relative;
-  }
-  .nav-btn {
-    font-family: 'Courier New', monospace;
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    background: var(--card);
-    color: var(--ink);
-    border: 1px solid var(--card-line);
-    border-radius: 7px;
-    padding: 9px 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .nav-dropdown {
-    position: absolute;
-    top: 42px;
-    left: 0;
-    background: var(--card);
-    border: 1px solid var(--card-line);
-    border-radius: 10px;
-    overflow: hidden;
-    z-index: 10;
-    min-width: 190px;
-    display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  }
-  .nav-dropdown.open { display: block; }
-  .nav-link {
-    display: block;
-    padding: 12px 16px;
-    font-family: 'Courier New', monospace;
-    font-size: 12.5px;
-    color: var(--ink-dim);
-    text-decoration: none;
-    border-bottom: 1px solid var(--card-line);
-  }
-  .nav-link:last-child { border-bottom: none; }
-  .nav-link.active { color: var(--gold); }
-  .nav-link.disabled { opacity: 0.4; pointer-events: none; }
-
-  .gear-btn {
-    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
-    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
-  }
-  .gear-dropdown {
-    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
-  }
-  .gear-dropdown.open { display: block; }
-  .gear-status {
-    font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px;
-    text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
-  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
-  .theme-toggle-row {
-    display: flex; gap: 6px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--card-line);
-  }
-  .theme-btn {
-    flex: 1; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase;
-    background: var(--bg); color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 6px;
-    padding: 8px 6px; cursor: pointer;
-  }
-  .theme-btn.selected { background: var(--gold); color: var(--card); border-color: var(--gold); font-weight: 600; }
-  .gear-settings-link {
-    display: block; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-line);
-    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
-  }
-
-  .header { margin-bottom: 18px; }
-  .eyebrow {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin: 0 0 6px;
-  }
-  .title {
-    font-size: 28px;
-    font-weight: 600;
-    margin: 0 0 4px;
-    letter-spacing: -0.01em;
-  }
-  .subtitle {
-    font-family: 'Courier New', monospace;
-    font-size: 12.5px;
-    color: var(--ink-dim);
-    margin: 0;
-  }
-
-  .auth-card {
-    margin: 16px 0 20px;
-    padding: 14px 16px;
-    background: var(--card);
-    border: 1px solid var(--card-line);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .auth-status {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    color: var(--ink-dim);
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .auth-email {
-    font-family: Georgia, serif;
-    font-size: 14.5px;
-    color: var(--ink);
-    margin: 2px 0 0;
-  }
-  .auth-btn {
-    font-family: 'Courier New', monospace;
-    font-size: 11.5px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    background: var(--gold);
-    color: var(--bg);
-    border: none;
-    border-radius: 6px;
-    padding: 9px 14px;
-    cursor: pointer;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .auth-btn:active { opacity: 0.8; }
-  .auth-btn.secondary {
-    background: transparent;
-    color: var(--ink-dim);
-    border: 1px solid var(--card-line);
-  }
-
-  .streak-row {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin: 0 0 24px;
-    padding: 14px 16px;
-    background: var(--card);
-    border: 1px solid var(--card-line);
-    border-radius: 10px;
-  }
-  .streak-num {
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--gold);
-    font-family: Georgia, serif;
-    line-height: 1;
+    justify-content: center;
+    font-size: 22px;
   }
   .streak-label {
-    font-family: 'Courier New', monospace;
-    font-size: 11.5px;
-    color: var(--ink-dim);
+    font-weight: 800;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
+    color: rgba(255,255,255,0.85);
+    margin: 0 0 2px;
+  }
+  .streak-main {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .streak-num {
+    font-family: var(--font-display);
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1;
+    color: #FFFFFF;
+  }
+  .streak-unit {
+    font-weight: 800;
+    font-size: 11px;
     letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.9);
+  }
+  .streak-sub {
+    font-weight: 600;
+    font-size: 11px;
+    color: rgba(255,255,255,0.75);
+    margin: 2px 0 0;
   }
 
+  /* Slot cards */
   .slot {
     display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 16px 4px;
-    border-bottom: 1px solid var(--card-line);
-    cursor: pointer;
-    transition: opacity 0.15s ease;
-  }
-  .slot:last-of-type { border-bottom: none; }
-  .slot:active { opacity: 0.7; }
-
-  .box {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    margin-top: 2px;
-    border: 1.5px solid var(--ink-dim);
-    border-radius: 6px;
-    display: flex;
     align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
+    gap: 13px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition: transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
   }
-  .box.checked {
-    background: var(--sage);
-    border-color: var(--sage);
-  }
-  .box svg { opacity: 0; transition: opacity 0.1s ease; }
-  .box.checked svg { opacity: 1; }
+  .slot:active { transform: scale(0.985); }
+  .slot[data-id="wake"]       { --slot-accent: var(--acc-orange); --slot-soft: var(--acc-orange-soft); }
+  .slot[data-id="morning"]    { --slot-accent: var(--acc-sky);    --slot-soft: var(--acc-sky-soft); }
+  .slot[data-id="between"]    { --slot-accent: var(--acc-purple); --slot-soft: var(--acc-purple-soft); }
+  .slot[data-id="evening"]    { --slot-accent: var(--acc-green);  --slot-soft: var(--acc-green-soft); }
+  .slot[data-id="before_bed"] { --slot-accent: var(--acc-pink);   --slot-soft: var(--acc-pink-soft); }
 
-  .slot-text { flex: 1; }
+  .slot-icon { background: var(--slot-soft); }
+
+  .slot-text { flex: 1; min-width: 0; }
   .slot-time {
-    font-family: 'Courier New', monospace;
-    font-size: 10.5px;
+    font-weight: 800;
+    font-size: 11.5px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-dim);
+    letter-spacing: 0.1em;
+    color: var(--slot-accent);
     margin: 0 0 3px;
   }
   .slot-swap {
-    font-size: 16px;
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--ink);
     margin: 0;
-    line-height: 1.3;
+    line-height: 1.4;
   }
-  .slot.checked .slot-swap { color: var(--ink-dim); text-decoration: line-through; text-decoration-color: var(--card-line); }
+  .slot.checked .slot-swap { color: var(--ink-dim); text-decoration: line-through; text-decoration-color: var(--line); }
+  .slot-swap.placeholder { color: var(--ink-dim); font-style: italic; }
 
-  .footer-note {
-    margin-top: 22px;
-    font-family: 'Courier New', monospace;
-    font-size: 11.5px;
-    color: var(--ink-dim);
-    text-align: center;
-    line-height: 1.6;
+  .box {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--slot-accent);
+    border-radius: var(--r-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
   }
+  .box.checked { background: var(--slot-accent); }
+  .box svg { opacity: 0; transform: scale(0.6); transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+  .box.checked svg { opacity: 1; transform: scale(1); }
 
-  .sync-note {
-    margin-top: 6px;
-    font-family: 'Courier New', monospace;
+  /* Today summary card */
+  .today-banner {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px;
+    margin-top: 18px;
+  }
+  .today-top { display: flex; align-items: center; gap: 14px; }
+  .today-ring {
+    flex-shrink: 0;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: conic-gradient(rgba(255,255,255,0.95) calc(var(--ring, 0) * 1%), rgba(255,255,255,0.25) 0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .today-ring-inner {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(50, 60, 170, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13.5px;
+    color: #FFFFFF;
+  }
+  .today-info { flex: 1; }
+  .today-label {
+    font-weight: 800;
     font-size: 10.5px;
-    color: var(--ink-dim);
-    text-align: center;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.85);
+    margin: 0 0 2px;
+  }
+  .today-count { font-weight: 700; font-size: 13.5px; color: #FFFFFF; margin: 0; }
+  .today-reset {
+    text-align: right;
+    font-weight: 600;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.85);
+    border-left: 1px solid rgba(255,255,255,0.25);
+    padding-left: 14px;
+    line-height: 1.5;
+  }
+  .sync-note {
+    margin-top: 0;
+    background: rgba(255,255,255,0.16);
+    border-radius: var(--r-pill);
+    padding: 8px 12px;
+    color: rgba(255,255,255,0.92);
+    font-weight: 700;
   }
 
   .reset-link {
     display: block;
     width: 100%;
     text-align: center;
-    margin-top: 14px;
-    font-family: 'Courier New', monospace;
-    font-size: 10.5px;
+    margin-top: 4px;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     color: var(--ink-dim);
-    text-decoration: underline;
+    text-decoration: none;
     cursor: pointer;
     background: none;
     border: none;
-    padding: 8px;
+    padding: 10px;
+    border-radius: var(--r-pill);
+  }
+
+  /* Edit mode */
+  .edit-input {
+    width: 100%;
+    padding: 12px;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .edit-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
   }
 </style>
 </head>
 <body>
 <div id="app">
   <div class="nav-row">
-    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <button class="nav-btn" id="navToggle" aria-label="Menu">&#9776;</button>
     <div class="nav-dropdown" id="navDropdown">
-      <a href="index.html" class="nav-link active">Scroll Swap</a>
+      <a href="index.html" class="nav-link active">Rotulus</a>
       <a href="dashboard.html" class="nav-link">Dashboard</a>
       <a href="goals.html" class="nav-link">Goals</a>
       <a href="lock-in.html" class="nav-link">Lock In</a>
@@ -328,7 +265,7 @@
       <a href="todo.html" class="nav-link">To-Do</a>
       <a href="settings.html" class="nav-link">Settings</a>
     </div>
-    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <button class="gear-btn" id="gearToggle" title="Settings" aria-label="Settings">&#9881;</button>
     <div class="gear-dropdown" id="gearDropdown">
       <div id="gearAccountSection"></div>
       <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
@@ -336,9 +273,9 @@
   </div>
 
   <div class="header">
-    <p class="eyebrow">Daily log</p>
-    <h1 class="title">Scroll Swap</h1>
-    <p class="subtitle">Four slots a day. Beat the reflex, not the urge.</p>
+    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
+    <h1 class="title">Rotulus</h1>
+    <p class="subtitle">Five slots a day.<br>Beat the <span class="hl">reflex</span>, not the urge.</p>
   </div>
 
   <div class="auth-card" id="authCard">
@@ -353,13 +290,27 @@
   const STORAGE_PREFIX = 'scrollswap_';
   const FUNCTION_URL = '/.netlify/functions/habits';
 
+  /* Slots start with no text of their own. The 'placeholder' is a
+     habit-stacking example ("After [daily anchor], do [replacement habit]")
+     shown greyed out until the user writes their own swap for that slot. */
   const DEFAULT_SLOTS = [
-    { id: 'wake', time: 'Wake up', swap: 'Music or a podcast on, before the phone comes out' },
-    { id: 'morning', time: 'Morning', swap: 'Stretch, eat breakfast, or read something short before opening socials' },
-    { id: 'between', time: 'Afternoon', swap: 'A few quick chess games instead of reels' },
-    { id: 'evening', time: 'Evening', swap: 'Hoops, a walk, or reading something you chose' },
-    { id: 'before_bed', time: 'Before bed', swap: 'Audio only, screen face-down or out of reach' },
+    { id: 'wake', time: 'Wake up', placeholder: 'After you turn off your alarm, drink a glass of water before the phone comes out' },
+    { id: 'morning', time: 'Morning', placeholder: 'After breakfast, read a few pages instead of opening socials' },
+    { id: 'between', time: 'Afternoon', placeholder: 'After lunch, take a 10-minute walk instead of reels' },
+    { id: 'evening', time: 'Evening', placeholder: 'After dinner, do a workout, a hobby, or a chore before any screens' },
+    { id: 'before_bed', time: 'Before bed', placeholder: 'After getting into bed, switch to audio and leave the screen face-down' },
   ];
+
+  /* Placeholder glyphs until the real slot icons are generated.
+     Future swap point: replace the emoji with
+     <img src="/assets/icons/slot-<id>.png" alt=""> inside .slot-icon. */
+  const SLOT_ICONS = {
+    wake: '\u{1F305}',
+    morning: '☀️',
+    between: '\u{1F4D6}',
+    evening: '\u{1F45F}',
+    before_bed: '\u{1F319}',
+  };
 
   let customLabels = {}; // { [slotId]: { time, swap } }
 
@@ -367,7 +318,8 @@
     return DEFAULT_SLOTS.map(s => ({
       id: s.id,
       time: (customLabels[s.id] && customLabels[s.id].time) || s.time,
-      swap: (customLabels[s.id] && customLabels[s.id].swap) || s.swap,
+      swap: (customLabels[s.id] && customLabels[s.id].swap) || '',
+      placeholder: s.placeholder,
     }));
   }
 
@@ -412,7 +364,7 @@
   function todayKey() { return STORAGE_PREFIX + dateKey(getEffectiveDate()); }
 
   function checkmarkSVG() {
-    return '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#1C1F1D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
   function isWin(s) {
@@ -468,7 +420,7 @@
   // ---- Server sync (only when logged in) ----
 
   function isScrollSwapOwnKey(suffix) {
-    // Only real date entries (YYYY-MM-DD) and the labels key belong to Scroll Swap.
+    // Only real date entries (YYYY-MM-DD) and the labels key belong to the habit tracker.
     // Other pages (Pomodoro, Settings, etc.) also use 'scrollswap_' as part of their
     // own key names, so this must NOT match anything broader than that.
     return suffix === '_labels' || /^\d{4}-\d{2}-\d{2}$/.test(suffix);
@@ -536,17 +488,18 @@
     const el = document.getElementById('syncNote');
     if (!el) return;
     if (!currentUser) {
-      el.textContent = 'Not synced \u2014 log in to save across devices';
+      el.textContent = 'Not synced — log in to save across devices';
     } else if (syncing) {
-      el.textContent = 'Syncing\u2026';
+      el.textContent = 'Syncing…';
     } else {
-      el.textContent = 'Synced to your account';
+      el.textContent = '✓ Synced to your account';
     }
   }
 
   // ---- Tracker UI ----
 
   let editMode = false;
+  let editFocusId = null; // slot to focus when the editor was opened from a placeholder tap
 
   function renderTracker() {
     if (editMode) {
@@ -556,28 +509,75 @@
     }
   }
 
+  function checkedCount() {
+    return Object.values(state).filter(Boolean).length;
+  }
+
+  /* Targeted updates for the hot path (slot toggle) so taps feel instant
+     instead of waiting on a full re-render. */
+  function updateProgressUI() {
+    const total = getSlots().length;
+    const count = checkedCount();
+    const pct = total ? (count / total) * 100 : 0;
+    const streakNum = document.getElementById('streakNum');
+    if (streakNum) streakNum.textContent = streak;
+    const streakUnit = document.getElementById('streakUnit');
+    if (streakUnit) streakUnit.textContent = `day streak${streak === 1 ? '' : 's'}`;
+    const streakRing = document.getElementById('streakRing');
+    if (streakRing) streakRing.style.setProperty('--ring', pct);
+    const todayRing = document.getElementById('todayRing');
+    if (todayRing) todayRing.style.setProperty('--ring', pct);
+    const todayRatio = document.getElementById('todayRatio');
+    if (todayRatio) todayRatio.textContent = `${count}/${total}`;
+    const todayCount = document.getElementById('todayCount');
+    if (todayCount) todayCount.textContent = `${count} of ${total} completed`;
+  }
+
   function renderNormalView() {
     const tracker = document.getElementById('tracker');
-    const checkedCount = Object.values(state).filter(Boolean).length;
     const slots = getSlots();
+    const total = slots.length;
+    const count = checkedCount();
+    const pct = total ? (count / total) * 100 : 0;
     tracker.innerHTML = `
-      <div class="streak-row">
-        <span class="streak-num">${streak}</span>
-        <span class="streak-label">day streak${streak === 1 ? '' : 's'}<br>(${winThreshold()}+ swaps a day)</span>
+      <div class="hero-card streak-banner">
+        <div class="streak-ring" id="streakRing" style="--ring:${pct}">
+          <div class="streak-ring-inner">\u{1F525}</div>
+        </div>
+        <div>
+          <p class="streak-label">Daily streak</p>
+          <div class="streak-main">
+            <span class="streak-num" id="streakNum">${streak}</span>
+            <span class="streak-unit" id="streakUnit">day streak${streak === 1 ? '' : 's'}</span>
+          </div>
+          <p class="streak-sub">(${winThreshold()}+ swaps a day)</p>
+        </div>
       </div>
       <div class="slots">
         ${slots.map(s => `
           <div class="slot ${state[s.id] ? 'checked' : ''}" data-id="${s.id}">
-            <div class="box ${state[s.id] ? 'checked' : ''}">${checkmarkSVG()}</div>
+            <div class="icon-tile slot-icon">${SLOT_ICONS[s.id] || '✨'}</div>
             <div class="slot-text">
               <p class="slot-time">${s.time}</p>
-              <p class="slot-swap">${s.swap}</p>
+              <p class="slot-swap${s.swap ? '' : ' placeholder'}">${s.swap || s.placeholder}</p>
             </div>
+            <div class="box ${state[s.id] ? 'checked' : ''}">${checkmarkSVG()}</div>
           </div>
         `).join('')}
       </div>
-      <p class="footer-note">${checkedCount} of ${slots.length} today &middot; resets at ${formatResetHourLabel(getResetHour())}</p>
-      <p class="sync-note" id="syncNote"></p>
+      <div class="today-card today-banner">
+        <div class="today-top">
+          <div class="today-ring" id="todayRing" style="--ring:${pct}">
+            <div class="today-ring-inner" id="todayRatio">${count}/${total}</div>
+          </div>
+          <div class="today-info">
+            <p class="today-label">Today</p>
+            <p class="today-count" id="todayCount">${count} of ${total} completed</p>
+          </div>
+          <div class="today-reset">Resets at<br>${formatResetHourLabel(getResetHour())}</div>
+        </div>
+        <p class="sync-note" id="syncNote"></p>
+      </div>
       <div style="display:flex; gap:10px; margin-top:14px;">
         <button class="reset-link" id="resetBtn" style="flex:1;">clear today</button>
         <button class="reset-link" id="editBtn" style="flex:1;">edit text</button>
@@ -585,12 +585,25 @@
     `;
 
     tracker.querySelectorAll('.slot').forEach(el => {
-      el.addEventListener('click', async () => {
+      el.addEventListener('click', async (e) => {
+        // Tapping the greyed-out example text of an unset slot opens the
+        // editor for it; slots with real text only toggle here.
+        if (e.target.closest('.slot-swap.placeholder')) {
+          editMode = true;
+          editFocusId = el.dataset.id;
+          renderTracker();
+          return;
+        }
         const id = el.dataset.id;
         state[id] = !state[id];
+        const on = !!state[id];
+        // Optimistic UI: flip classes immediately, no full re-render.
+        el.classList.toggle('checked', on);
+        const box = el.querySelector('.box');
+        if (box) box.classList.toggle('checked', on);
         saveTodayLocal();
         computeStreak();
-        renderTracker();
+        updateProgressUI();
         if (currentUser) await pushToServer();
       });
     });
@@ -618,19 +631,26 @@
       <p class="footer-note" style="margin-top:0; margin-bottom:16px;">Edit the label and swap idea for each slot below.</p>
       <div class="slots">
         ${slots.map(s => `
-          <div class="slot" style="cursor:default; flex-direction:column; align-items:stretch; gap:8px;">
-            <input type="text" class="duration-input edit-time-input" data-id="${s.id}" value="${s.time.replace(/"/g, '&quot;')}"
-              style="width:100%; text-align:left; padding:10px;">
-            <textarea class="duration-input edit-swap-input" data-id="${s.id}" rows="2"
-              style="width:100%; text-align:left; padding:10px; resize:vertical; font-family:Georgia, serif; font-size:15px;">${s.swap}</textarea>
+          <div class="edit-slot">
+            <input type="text" class="edit-input edit-time-input" data-id="${s.id}" value="${s.time.replace(/"/g, '&quot;')}">
+            <textarea class="edit-input edit-swap-input" data-id="${s.id}" rows="2" style="resize:vertical;" placeholder="${s.placeholder.replace(/"/g, '&quot;')}">${s.swap}</textarea>
           </div>
         `).join('')}
       </div>
       <div style="display:flex; gap:10px; margin-top:16px;">
         <button class="reset-link" id="cancelEditBtn" style="flex:1;">cancel</button>
-        <button class="reset-link" id="saveEditBtn" style="flex:1; color:var(--sage);">save</button>
+        <button class="reset-link" id="saveEditBtn" style="flex:1; color:var(--green);">save</button>
       </div>
     `;
+
+    if (editFocusId) {
+      const target = tracker.querySelector(`.edit-swap-input[data-id="${editFocusId}"]`);
+      if (target) {
+        target.focus();
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+      editFocusId = null;
+    }
 
     document.getElementById('cancelEditBtn').addEventListener('click', () => {
       editMode = false;
@@ -647,8 +667,11 @@
       });
       swapInputs.forEach(input => {
         const id = input.dataset.id;
+        const text = input.value.trim();
         customLabels[id] = customLabels[id] || {};
-        customLabels[id].swap = input.value.trim() || DEFAULT_SLOTS.find(d => d.id === id).swap;
+        // Blank means "unset" — the slot reverts to its greyed-out example.
+        if (text) customLabels[id].swap = text;
+        else delete customLabels[id].swap;
       });
       saveLabelsLocal();
       editMode = false;
@@ -695,63 +718,14 @@
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
 
-  // ---- Theme ----
-
-  function applyTheme(theme) {
-    document.documentElement.classList.toggle('theme-light', theme === 'light');
-    document.querySelectorAll('.theme-btn').forEach(b => {
-      b.classList.toggle('selected', b.dataset.theme === theme);
-    });
-  }
-
-  function initTheme() {
-    let saved = 'dark';
-    try {
-      saved = localStorage.getItem('scrollswap_theme') || 'dark';
-    } catch (e) {}
-    applyTheme(saved);
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const theme = btn.dataset.theme;
-        applyTheme(theme);
-        try { localStorage.setItem('scrollswap_theme', theme); } catch (e) {}
-      });
-    });
-  }
-
-  // ---- Nav dropdown ----
-
-  function initNav() {
-    const toggle = document.getElementById('navToggle');
-    const dropdown = document.getElementById('navDropdown');
-    const gearToggle = document.getElementById('gearToggle');
-    const gearDropdown = document.getElementById('gearDropdown');
-
-    toggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      gearDropdown.classList.remove('open');
-      dropdown.classList.toggle('open');
-    });
-    gearToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.remove('open');
-      gearDropdown.classList.toggle('open');
-    });
-    document.addEventListener('click', () => {
-      dropdown.classList.remove('open');
-      gearDropdown.classList.remove('open');
-    });
-  }
-
   // ---- Init ----
+  // Theme + nav dropdown behavior now lives in /js/rotulus-shared.js.
 
   async function initApp() {
-    initTheme();
     loadToday();
     loadLabelsLocal();
     computeStreak();
     renderTracker();
-    initNav();
   }
 
   function initIdentity() {

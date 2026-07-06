@@ -3,159 +3,180 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Dashboard &middot; Scroll Swap</title>
+<title>Dashboard &middot; Rotulus</title>
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Dashboard">
-<meta name="theme-color" content="#1C1F1D">
+<meta name="theme-color" content="#EDEBF7">
 
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='10' y='10' width='160' height='160' rx='30' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Crect x='45' y='45' width='40' height='40' rx='6' fill='%237A9B7E'/%3E%3Crect x='95' y='45' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='45' y='95' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='95' y='95' width='40' height='40' rx='6' fill='%23C9A24B'/%3E%3C/svg%3E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%231C1F1D'/%3E%3Crect x='45' y='45' width='40' height='40' rx='6' fill='%237A9B7E'/%3E%3Crect x='95' y='45' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='45' y='95' width='40' height='40' rx='6' fill='none' stroke='%237A9B7E' stroke-width='6'/%3E%3Crect x='95' y='95' width='40' height='40' rx='6' fill='%23C9A24B'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" sizes="512x512" href="/assets/app-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%236C5CE7'/%3E%3Crect x='45' y='45' width='40' height='40' rx='10' fill='%23FFFFFF'/%3E%3Crect x='95' y='45' width='40' height='40' rx='10' fill='none' stroke='%23FFFFFF' stroke-width='6'/%3E%3Crect x='45' y='95' width='40' height='40' rx='10' fill='none' stroke='%23FFFFFF' stroke-width='6'/%3E%3Crect x='95' y='95' width='40' height='40' rx='10' fill='%23FFFFFF'/%3E%3C/svg%3E">
+
+<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/rotulus.css?v=1">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script defer src="/js/rotulus-shared.js?v=1"></script>
 
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; min-height: 100dvh; }
-  body {
-    display: flex; align-items: flex-start; justify-content: center;
-    padding-top: max(28px, env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom);
-  }
-  :root {
-    --ink: #EDEAE2; --ink-dim: #A8A296; --bg: #1C1F1D; --card: #242824; --card-line: #34392F;
-    --gold: #C9A24B; --sage: #7A9B7E;
-    --cat-productivity: #6FA37A; --cat-workout: #C1503F; --cat-reading: #D9B54A;
-  }
-  :root.theme-light {
-    --ink: #2A2A26; --ink-dim: #8A8478; --bg: #F3F1EA; --card: #FFFFFF; --card-line: #DDD8CB;
-    --gold: #A97F2E; --sage: #4F7A57;
-    --cat-productivity: #4F7A57; --cat-workout: #A8402F; --cat-reading: #A98A2E;
-  }
+  /* Page-specific: dashboard */
 
-  #app {
-    font-family: Georgia, 'Iowan Old Style', serif; color: var(--ink); background: var(--bg);
-    padding: 8px 22px 40px; max-width: 480px; width: 100%; margin: 0 auto;
-  }
-
-  /* Nav */
-  .nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; position: relative; }
-  .nav-btn {
-    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
-    background: var(--card); color: var(--ink); border: 1px solid var(--card-line); border-radius: 7px;
-    padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
-  }
-  .nav-dropdown {
-    position: absolute; top: 42px; left: 0; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 190px; display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  }
-  .nav-dropdown.open { display: block; }
-  .nav-link {
-    display: block; padding: 12px 16px; font-family: 'Courier New', monospace; font-size: 12.5px;
-    color: var(--ink-dim); text-decoration: none; border-bottom: 1px solid var(--card-line);
-  }
-  .nav-link:last-child { border-bottom: none; }
-  .nav-link.active { color: var(--gold); }
-
-  .gear-btn {
-    width: 38px; height: 38px; border-radius: 8px; background: var(--card); border: 1px solid var(--card-line);
-    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 17px;
-  }
-  .gear-dropdown {
-    position: absolute; top: 42px; right: 0; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; overflow: hidden; z-index: 10; min-width: 210px; display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 14px 16px;
-  }
-  .gear-dropdown.open { display: block; }
-  .gear-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .gear-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 0 0 12px; }
-  .gear-note { font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; margin: 0; }
-  .gear-settings-link {
-    display: block; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-line);
-    font-family: 'Courier New', monospace; font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
-  }
-
-  .header { margin-bottom: 18px; }
-  .eyebrow { font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
-  .title { font-size: 26px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .subtitle { font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--ink-dim); margin: 0; }
-
-  .auth-card {
-    margin: 16px 0 20px; padding: 14px 16px; background: var(--card); border: 1px solid var(--card-line);
-    border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-  }
-  .auth-status { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
-  .auth-email { font-family: Georgia, serif; font-size: 14.5px; color: var(--ink); margin: 2px 0 0; }
-  .auth-btn {
-    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
-    background: var(--gold); color: var(--bg); border: none; border-radius: 6px; padding: 9px 14px;
-    cursor: pointer; font-weight: 600; white-space: nowrap;
-  }
-  .auth-btn.secondary { background: transparent; color: var(--ink-dim); border: 1px solid var(--card-line); }
-
-  /* Quote */
+  /* Today's note banner */
   .quote-card {
-    background: var(--card); border: 1px solid var(--card-line); border-radius: 14px; padding: 22px 20px;
-    margin-bottom: 18px; text-align: center;
+    padding: 20px;
+    margin-bottom: 18px;
+    text-align: center;
   }
-  .quote-text { font-size: 18px; font-style: italic; line-height: 1.5; margin: 0; color: var(--ink); }
   .quote-label {
-    font-family: 'Courier New', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--gold); margin: 0 0 10px;
+    display: inline-block;
+    background: rgba(255,255,255,0.18);
+    border-radius: var(--r-pill);
+    padding: 5px 12px;
+    font-weight: 800;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.92);
+    margin: 0 0 10px;
+  }
+  .quote-text {
+    font-size: 16.5px;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1.5;
+    margin: 0;
+    color: #FFFFFF;
   }
 
   /* Stats grid */
-  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
   .stat-card {
-    background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 16px 14px; text-align: center;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    padding: 14px;
   }
-  .stat-num { font-size: 26px; font-weight: 700; color: var(--gold); font-family: Georgia, serif; line-height: 1; margin-bottom: 6px; }
-  .stat-label { font-family: 'Courier New', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); line-height: 1.4; }
+  .stat-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .stat-icon { width: 34px; height: 34px; font-size: 16px; background: var(--acc-soft); }
+  .stat-num {
+    font-family: var(--font-display);
+    font-size: 27px;
+    font-weight: 700;
+    color: var(--acc);
+    line-height: 1;
+    margin: 0;
+  }
+  .stat-label {
+    font-weight: 800;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    line-height: 1.4;
+    margin: 0;
+  }
 
+  /* Locked-in pill */
   .lockin-note-card {
-    background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 14px 16px;
-    margin-bottom: 18px; text-align: center;
+    background: var(--acc-green-soft);
+    border: 1px solid transparent;
+    border-radius: var(--r-pill);
+    padding: 11px 16px;
+    margin-bottom: 20px;
+    text-align: center;
   }
   .lockin-note-text {
-    font-family: 'Courier New', monospace; font-size: 12.5px; color: var(--sage); margin: 0;
+    font-weight: 700;
+    font-size: 12.5px;
+    color: var(--green);
+    margin: 0;
   }
 
   /* Chart section */
   .chart-section-title {
-    font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--ink-dim); margin: 0 0 10px;
+    font-weight: 800;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--primary);
+    margin: 0 0 10px;
   }
-  .range-toggle-row { display: flex; gap: 6px; margin-bottom: 18px; }
+  .range-toggle-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    padding: 4px;
+    box-shadow: var(--shadow-card);
+  }
   .range-btn {
-    flex: 1; font-family: 'Courier New', monospace; font-size: 10.5px; letter-spacing: 0.03em; text-transform: uppercase;
-    background: var(--card); color: var(--ink-dim); border: 1px solid var(--card-line); border-radius: 7px;
-    padding: 8px 6px; cursor: pointer;
+    flex: 1;
+    font-family: var(--font-body);
+    font-weight: 800;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--ink-dim);
+    border: none;
+    border-radius: var(--r-pill);
+    padding: 8px 6px;
+    cursor: pointer;
   }
-  .range-btn.selected { background: var(--gold); color: var(--bg); border-color: var(--gold); font-weight: 600; }
+  .range-btn.selected { background: var(--primary); color: var(--on-primary); }
+
   .chart-card {
-    background: var(--card); border: 1px solid var(--card-line); border-radius: 14px; padding: 20px;
-    display: flex; flex-direction: column; align-items: center; margin-bottom: 18px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 18px;
   }
-  .pie { width: 150px; height: 150px; border-radius: 50%; margin-bottom: 16px; }
-  .pie.empty { background: var(--card-line) !important; }
+  .pie-wrap { position: relative; width: 156px; height: 156px; margin-bottom: 16px; }
+  .pie { width: 100%; height: 100%; border-radius: 50%; }
+  .pie.empty { background: var(--line) !important; }
+  .pie-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    background: var(--card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: var(--shadow-card);
+  }
   .chart-legend { width: 100%; }
-  .legend-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px; font-family: 'Courier New', monospace; font-size: 12px; }
+  .legend-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px; font-weight: 700; font-size: 12.5px; }
   .legend-name { display: flex; align-items: center; gap: 8px; color: var(--ink); }
   .legend-pct { color: var(--ink-dim); }
   .cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-  .chart-empty-note { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink-dim); text-align: center; }
+  .chart-empty-note { font-weight: 600; font-size: 12px; color: var(--ink-dim); text-align: center; }
 
-  .sync-note { margin-top: 16px; font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--ink-dim); text-align: center; }
+  .sync-note { margin-top: 16px; }
 </style>
 </head>
 <body>
 <div id="app">
   <div class="nav-row">
-    <button class="nav-btn" id="navToggle">&#9776; Menu</button>
+    <button class="nav-btn" id="navToggle" aria-label="Menu">&#9776;</button>
     <div class="nav-dropdown" id="navDropdown">
-      <a href="index.html" class="nav-link">Scroll Swap</a>
+      <a href="index.html" class="nav-link">Rotulus</a>
       <a href="dashboard.html" class="nav-link active">Dashboard</a>
       <a href="goals.html" class="nav-link">Goals</a>
       <a href="lock-in.html" class="nav-link">Lock In</a>
@@ -164,7 +185,7 @@
       <a href="todo.html" class="nav-link">To-Do</a>
       <a href="settings.html" class="nav-link">Settings</a>
     </div>
-    <button class="gear-btn" id="gearToggle" title="Settings">&#9881;</button>
+    <button class="gear-btn" id="gearToggle" title="Settings" aria-label="Settings">&#9881;</button>
     <div class="gear-dropdown" id="gearDropdown">
       <div id="gearAccountSection"></div>
       <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
@@ -172,6 +193,7 @@
   </div>
 
   <div class="header">
+    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
     <p class="eyebrow">Overview</p>
     <h1 class="title">Dashboard</h1>
     <p class="subtitle">Where things stand today.</p>
@@ -181,7 +203,7 @@
     <p class="auth-status">Checking login&hellip;</p>
   </div>
 
-  <div class="quote-card">
+  <div class="today-card quote-card">
     <p class="quote-label">Today's note</p>
     <p class="quote-text" id="quoteText"></p>
   </div>
@@ -199,7 +221,10 @@
     <button class="range-btn" data-range="30">Last 30 days</button>
   </div>
   <div class="chart-card">
-    <div class="pie" id="pieCircle"></div>
+    <div class="pie-wrap">
+      <div class="pie" id="pieCircle"></div>
+      <div class="pie-center">&#9201;</div>
+    </div>
     <div class="chart-legend" id="chartLegend"></div>
   </div>
 
@@ -224,7 +249,7 @@
   const QUOTES = [
     'Small, consistent steps beat occasional bursts of effort.',
     'Discipline is choosing what you want most over what you want now.',
-    'You do not need to feel motivated to begin \u2014 begin, and motivation follows.',
+    'You do not need to feel motivated to begin — begin, and motivation follows.',
     'Progress hides inside boring, repeated days.',
     'The work you avoid the most is often the work that matters the most.',
     'Done today is worth more than perfect someday.',
@@ -235,7 +260,7 @@
     'What gets logged gets improved.',
     'Rest is part of the work, not a break from it.',
     'One honest hour beats three distracted ones.',
-    'Today only asks for today\u2019s effort, not the whole mountain.',
+    'Today only asks for today’s effort, not the whole mountain.',
     'The habit is the goal. The result is just proof.',
     'Nobody sees the quiet repetition behind a result they admire.',
     'You do not have to feel ready. You just have to start moving.',
@@ -413,27 +438,41 @@
     const goalsStats = getGoalsStats();
     const lockInMinutes = getLockInMinutes();
 
+    /* Placeholder glyphs — future swap point: replace the emoji with
+       <img src="/assets/icons/stat-*.png"> inside .stat-icon. */
     const grid = document.getElementById('statsGrid');
     grid.innerHTML = `
-      <div class="stat-card">
-        <p class="stat-num">${todoStats.totalCompleted}</p>
+      <div class="stat-card" style="--acc:var(--acc-sky); --acc-soft:var(--acc-sky-soft);">
+        <div class="stat-top">
+          <div class="icon-tile stat-icon">&#10004;&#65039;</div>
+          <p class="stat-num">${todoStats.totalCompleted}</p>
+        </div>
         <p class="stat-label">Tasks completed</p>
       </div>
-      <div class="stat-card">
-        <p class="stat-num">${pomodoroMinutes}</p>
+      <div class="stat-card" style="--acc:var(--acc-orange); --acc-soft:var(--acc-orange-soft);">
+        <div class="stat-top">
+          <div class="icon-tile stat-icon">&#9201;</div>
+          <p class="stat-num">${pomodoroMinutes}</p>
+        </div>
         <p class="stat-label">Pomodoro minutes</p>
       </div>
-      <div class="stat-card">
-        <p class="stat-num">${goalsStats.totalHours}</p>
+      <div class="stat-card" style="--acc:var(--acc-green); --acc-soft:var(--acc-green-soft);">
+        <div class="stat-top">
+          <div class="icon-tile stat-icon">&#127919;</div>
+          <p class="stat-num">${goalsStats.totalHours}</p>
+        </div>
         <p class="stat-label">Hours on goals</p>
       </div>
-      <div class="stat-card">
-        <p class="stat-num">${goalsStats.completedGoals}</p>
+      <div class="stat-card" style="--acc:var(--acc-purple); --acc-soft:var(--acc-purple-soft);">
+        <div class="stat-top">
+          <div class="icon-tile stat-icon">&#127942;</div>
+          <p class="stat-num">${goalsStats.completedGoals}</p>
+        </div>
         <p class="stat-label">Goals completed</p>
       </div>
     `;
 
-    document.getElementById('lockInNote').textContent = `You have been locked in for ${lockInMinutes} minutes`;
+    document.getElementById('lockInNote').textContent = `\u{1F512} You have been locked in for ${lockInMinutes} minutes`;
   }
 
   // ---- Pie chart ----
@@ -520,47 +559,22 @@
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
   }
 
-  // ---- Theme ----
-
-  function applyTheme(theme) {
-    document.documentElement.classList.toggle('theme-light', theme === 'light');
-  }
-
-  function initTheme() {
-    let saved = 'dark';
-    try { saved = localStorage.getItem('scrollswap_theme') || 'dark'; } catch (e) {}
-    applyTheme(saved);
-  }
-
-  // ---- Nav dropdown ----
-
-  function initNav() {
-    const toggle = document.getElementById('navToggle');
-    const dropdown = document.getElementById('navDropdown');
-    const gearToggle = document.getElementById('gearToggle');
-    const gearDropdown = document.getElementById('gearDropdown');
-    toggle.addEventListener('click', (e) => { e.stopPropagation(); gearDropdown.classList.remove('open'); dropdown.classList.toggle('open'); });
-    gearToggle.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.remove('open'); gearDropdown.classList.toggle('open'); });
-    document.addEventListener('click', () => { dropdown.classList.remove('open'); gearDropdown.classList.remove('open'); });
-  }
-
   function renderSyncNote() {
     const el = document.getElementById('syncNote');
     if (!el) return;
     if (!currentUser) el.textContent = 'Log in to see stats synced across devices';
-    else if (syncing) el.textContent = 'Syncing\u2026';
+    else if (syncing) el.textContent = 'Syncing…';
     else el.textContent = 'Showing data synced to your account';
   }
 
   // ---- Init ----
+  // Theme + nav dropdown behavior now lives in /js/rotulus-shared.js.
 
   function initApp() {
-    initTheme();
     renderQuote();
     renderStats();
     renderChart();
     initChartToggle();
-    initNav();
   }
 
   function initIdentity() {
