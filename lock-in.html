@@ -13,16 +13,33 @@
   /* Lock In is intentionally always dark, regardless of the app theme —
      it's a zero-distraction focus screen. */
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+  /* The gradient lives on the root element on purpose. A background set here
+     propagates to the whole viewport canvas, so it always covers the screen no
+     matter what a phone's address bar does. It used to sit on .lock-screen,
+     which was sized 100dvh — when the address bar hid, the visible screen grew
+     taller than that, the element stopped short, and the bottom-left gradient
+     (still faintly visible where it got cut) ended against plain #151020 and
+     drew a hard line across the screen.
+     min-height:100lvh sizes the root to the tallest the viewport can get, so
+     the gradient's percentage positions resolve against the full screen too. */
   html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%; min-height: 100vh; min-height: 100dvh;
-    background: #151020; overflow: hidden;
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    min-height: 100vh; min-height: 100lvh;
+    overflow: hidden;
   }
-  .lock-screen {
-    width: 100%; height: 100vh; height: 100dvh; display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
+  html {
     background:
       radial-gradient(500px 420px at 88% 8%, rgba(124, 92, 255, 0.10), transparent 70%),
-      radial-gradient(440px 380px at 8% 90%, rgba(47, 110, 217, 0.08), transparent 70%);
+      radial-gradient(440px 380px at 8% 90%, rgba(47, 110, 217, 0.08), transparent 70%),
+      #151020;
+    background-repeat: no-repeat;
+  }
+  /* Sized with dvh purely so the text stays optically centred in whatever is
+     actually visible. It paints nothing — the canvas behind it does. */
+  .lock-screen {
+    width: 100%; height: 100vh; height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
   }
   .lock-text {
     font-family: ui-rounded, -apple-system, 'Segoe UI', sans-serif;

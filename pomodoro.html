@@ -62,6 +62,7 @@
 
   /* Timer card */
   .timer-card {
+    position: relative; /* anchors the progress ring overlay */
     background: var(--grad-timer);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
@@ -70,6 +71,29 @@
     text-align: center;
     margin-bottom: 20px;
   }
+  /* Progress ring — a glowing line tracing the inner edge of the card that
+     drains counter-clockwise as the session runs down. Colour follows the
+     selected category (sky blue on a break) and is set from JS via
+     --ring-color, so the stroke and its glow always match. */
+  .timer-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* must never intercept taps on the buttons beneath */
+    overflow: visible;    /* let the glow spill past the edge */
+  }
+  .timer-ring path {
+    fill: none;
+    stroke: var(--ring-color, var(--primary));
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 4px var(--ring-color, var(--primary)));
+    transition: stroke-dashoffset 1s linear; /* smooths the 1Hz tick into a continuous drain */
+  }
+  /* Applied while the value jumps for a reason other than time passing
+     (start, reset, mode switch, restore after reload) so it doesn't sweep. */
+  .timer-ring.no-anim path { transition: none; }
   .timer-cat-label {
     display: inline-block;
     font-weight: 800;
@@ -139,7 +163,18 @@
   .timer-btn.start { background: var(--green); color: #FFFFFF; }
   .timer-btn.pause { background: var(--primary); color: var(--on-primary); }
   .timer-btn.reset { background: var(--card); color: var(--ink-dim); border: 1px solid var(--line); }
+  .timer-btn.break { background: var(--acc-sky); color: #FFFFFF; }
   .timer-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  /* Break controls, separated from the focus controls by a hairline. */
+  .break-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
 
   /* Totals */
   .totals-title {
@@ -303,7 +338,8 @@
 
   <div class="category-row" id="categoryRow"></div>
 
-  <div class="timer-card">
+  <div class="timer-card" id="timerCard">
+    <svg class="timer-ring" id="timerRing" aria-hidden="true"><path id="timerRingPath"></path></svg>
     <p class="timer-cat-label" id="timerCatLabel"></p>
     <p class="timer-display" id="timerDisplay">25:00</p>
     <div class="duration-row">
@@ -314,6 +350,11 @@
       <button class="timer-btn start" id="startBtn">Start</button>
       <button class="timer-btn pause" id="pauseBtn" disabled>Pause</button>
       <button class="timer-btn reset" id="resetBtn">Reset</button>
+    </div>
+    <div class="break-row">
+      <span class="duration-label">Break</span>
+      <input type="number" class="duration-input" id="breakInput" value="5" min="1" max="60">
+      <button class="timer-btn break" id="breakBtn">Start break</button>
     </div>
   </div>
 
@@ -356,8 +397,28 @@
   let todayTotals = {};
   let currentUser = null;
   let syncing = false;
+  let syncFailed = false;
 
   const TIMER_STATE_KEY = 'scrollswap_pomodoro_timer';
+  /* Deliberately under the 'scrollswap_' prefix, NOT 'pomodoro_':
+     collectAllLocalHistory() sweeps every pomodoro_* key and treats the suffix
+     as a date, so a settings key there would be synced as a bogus day entry
+     and pollute the totals and the pie chart. */
+  const BREAK_MINUTES_KEY = 'scrollswap_pomodoro_break_minutes';
+
+  let breakSeconds = 5 * 60;
+
+  function loadBreakMinutes() {
+    try {
+      const raw = localStorage.getItem(BREAK_MINUTES_KEY);
+      const val = raw !== null ? parseInt(raw, 10) : 5;
+      return (isNaN(val) || val < 1 || val > 60) ? 5 : val;
+    } catch (e) { return 5; }
+  }
+
+  function saveBreakMinutes(minutes) {
+    try { localStorage.setItem(BREAK_MINUTES_KEY, String(minutes)); } catch (e) {}
+  }
 
   function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -388,7 +449,9 @@
   function defaultTimerState() {
     return {
       category: 'productivity',
-      durationSeconds: 25 * 60,
+      mode: 'focus',                     // 'focus' | 'break' — what the clock is counting
+      durationSeconds: 25 * 60,          // length of whatever is currently running
+      focusDurationSeconds: 25 * 60,     // remembers the focus length while a break is running
       remainingAtAnchor: 25 * 60,
       anchorTimestamp: null,
       running: false,
@@ -398,8 +461,27 @@
   function loadTimerState() {
     try {
       const raw = localStorage.getItem(TIMER_STATE_KEY);
-      return raw ? JSON.parse(raw) : defaultTimerState();
+      if (!raw) return defaultTimerState();
+      const ts = JSON.parse(raw);
+      // Backfill for states saved before breaks existed — a session already in
+      // progress when this shipped must keep running, not reset.
+      if (ts.mode !== 'break') ts.mode = 'focus';
+      if (typeof ts.focusDurationSeconds !== 'number') {
+        ts.focusDurationSeconds = ts.mode === 'focus' ? ts.durationSeconds : 25 * 60;
+      }
+      return ts;
     } catch (e) { return defaultTimerState(); }
+  }
+
+  /* A fresh, stopped focus session at the remembered focus length. Used
+     whenever a break ends or is cancelled, and by Reset. */
+  function freshFocusState(ts) {
+    const next = defaultTimerState();
+    next.category = ts.category;
+    next.focusDurationSeconds = ts.focusDurationSeconds;
+    next.durationSeconds = ts.focusDurationSeconds;
+    next.remainingAtAnchor = ts.focusDurationSeconds;
+    return next;
   }
 
   function saveTimerState(ts) {
@@ -433,15 +515,29 @@
     });
   }
 
+  function hasLocalData() {
+    return Object.keys(collectAllLocalHistory()).length > 0;
+  }
+
+  /* Returns true only if the download actually completed. Callers MUST check
+     this before uploading: pushing after a failed download would overwrite the
+     server copy with whatever this device happens to hold, which may be nothing
+     (e.g. a brand new browser, or a fresh domain — localStorage is per-domain). */
   async function pullFromServer() {
-    if (!currentUser) return;
+    if (!currentUser) return false;
     try {
       const token = await currentUser.jwt();
       const res = await fetch(FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) return;
+      if (!res.ok) { syncFailed = true; return false; }
       const serverHistory = await res.json();
       writeHistoryToLocal(serverHistory);
-    } catch (e) { console.error('Pull failed', e); }
+      syncFailed = false;
+      return true;
+    } catch (e) {
+      console.error('Pull failed', e);
+      syncFailed = true;
+      return false;
+    }
   }
 
   async function pushToServer() {
@@ -451,13 +547,15 @@
     try {
       const token = await currentUser.jwt();
       const history = collectAllLocalHistory();
-      await fetch(FUNCTION_URL, {
+      const res = await fetch(FUNCTION_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(history),
       });
+      syncFailed = !res.ok;
     } catch (e) {
       console.error('Push failed', e);
+      syncFailed = true;
     } finally {
       syncing = false;
       renderSyncNote();
@@ -469,6 +567,7 @@
     if (!el) return;
     if (!currentUser) el.textContent = 'Not synced — log in to save across devices';
     else if (syncing) el.textContent = 'Syncing…';
+    else if (syncFailed) el.textContent = '⚠ Sync failed — this device’s data is safe, but not saved to your account';
     else el.textContent = 'Synced to your account';
   }
 
@@ -498,16 +597,104 @@
         ts.category = selectedCategory;
         saveTimerState(ts);
         renderCategoryRow();
-        renderTimerLabel();
+        setControlsState(ts); // repaints the label and the ring in the new colour
       });
     });
   }
 
-  function renderTimerLabel() {
-    const cat = CATEGORIES.find(c => c.id === selectedCategory);
+  function renderTimerLabel(ts) {
     const label = document.getElementById('timerCatLabel');
+    const state = ts || loadTimerState();
+    if (state.mode === 'break') {
+      label.textContent = 'Break';
+      label.style.background = 'var(--acc-sky)';
+      return;
+    }
+    const cat = CATEGORIES.find(c => c.id === selectedCategory);
     label.textContent = cat ? cat.label : '';
     label.style.background = cat ? cat.color : '';
+  }
+
+  // ---- Progress ring ----
+
+  const RING_INSET = 2.25; // half the 2.5px stroke, +1px, so it sits inside the card border
+  let ringLength = 0;
+
+  /* Rounded-rect path traversed COUNTER-CLOCKWISE from top-centre: left along
+     the top edge, down the left side, right along the bottom, up the right
+     side. Drawing it in that direction is what makes stroke-dashoffset eat the
+     line counter-clockwise as the session drains. All four arcs use sweep-flag
+     0 for the same reason. */
+  function roundedRectPath(inset, w, h, r) {
+    const x0 = inset, y0 = inset, x1 = w - inset, y1 = h - inset;
+    const rr = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+    return [
+      `M ${x0 + (x1 - x0) / 2} ${y0}`,
+      `H ${x0 + rr}`,
+      `A ${rr} ${rr} 0 0 0 ${x0} ${y0 + rr}`,
+      `V ${y1 - rr}`,
+      `A ${rr} ${rr} 0 0 0 ${x0 + rr} ${y1}`,
+      `H ${x1 - rr}`,
+      `A ${rr} ${rr} 0 0 0 ${x1} ${y1 - rr}`,
+      `V ${y0 + rr}`,
+      `A ${rr} ${rr} 0 0 0 ${x1 - rr} ${y0}`,
+      'Z',
+    ].join(' ');
+  }
+
+  function rebuildRingGeometry() {
+    const card = document.getElementById('timerCard');
+    const path = document.getElementById('timerRingPath');
+    if (!card || !path) return;
+    const w = card.clientWidth, h = card.clientHeight;
+    if (!w || !h) return;
+    const radius = parseFloat(getComputedStyle(card).borderTopLeftRadius) || 20;
+    path.setAttribute('d', roundedRectPath(RING_INSET, w, h, Math.max(0, radius - RING_INSET)));
+    ringLength = path.getTotalLength();
+    path.style.strokeDasharray = String(ringLength);
+  }
+
+  function ringColorFor(ts) {
+    if (ts.mode === 'break') return 'var(--acc-sky)';
+    const cat = CATEGORIES.find(c => c.id === ts.category);
+    return cat ? cat.color : 'var(--primary)';
+  }
+
+  /* animate=true only for the once-a-second tick, where the CSS transition
+     turns 1Hz updates into one continuous drain. Everything else is a jump
+     (start, reset, mode switch, restore after a reload) and must not sweep. */
+  function renderTimerRing(ts, remaining, animate) {
+    const svg = document.getElementById('timerRing');
+    const path = document.getElementById('timerRingPath');
+    if (!svg || !path) return;
+    if (!ringLength) rebuildRingGeometry();
+    if (!ringLength) return;
+    svg.style.setProperty('--ring-color', ringColorFor(ts));
+    const total = ts.durationSeconds > 0 ? ts.durationSeconds : 1;
+    const fraction = Math.max(0, Math.min(1, remaining / total));
+    if (!animate) {
+      svg.classList.add('no-anim');
+      void svg.offsetWidth; // commit the class before the value changes
+    }
+    path.style.strokeDashoffset = String(ringLength * (1 - fraction));
+    if (!animate) {
+      void svg.offsetWidth; // commit the value before transitions come back
+      svg.classList.remove('no-anim');
+    }
+  }
+
+  /* The card changes height with the break row, the theme, the viewport and
+     late-loading web fonts, so the geometry can't be measured just once. */
+  function initTimerRing() {
+    const card = document.getElementById('timerCard');
+    if (!card) return;
+    rebuildRingGeometry();
+    if (typeof ResizeObserver === 'undefined') return;
+    new ResizeObserver(() => {
+      rebuildRingGeometry();
+      const ts = loadTimerState();
+      renderTimerRing(ts, currentRemaining(ts), false);
+    }).observe(card);
   }
 
   // ---- Timer logic ----
@@ -519,12 +706,23 @@
   function setControlsState(ts) {
     const fresh = !ts.running && ts.remainingAtAnchor === ts.durationSeconds;
     const paused = !ts.running && !fresh;
-    document.getElementById('startBtn').disabled = ts.running || paused;
-    document.getElementById('durationInput').disabled = ts.running || paused;
+    const onBreak = ts.mode === 'break';
+    // Start stays live during a break — pressing it ends the break and starts
+    // a focus session, which is the point of it.
+    document.getElementById('startBtn').disabled = onBreak ? false : (ts.running || paused);
+    document.getElementById('durationInput').disabled = onBreak ? false : (ts.running || paused);
     document.getElementById('resetBtn').disabled = false;
     const pauseBtn = document.getElementById('pauseBtn');
     pauseBtn.disabled = fresh;
     pauseBtn.textContent = ts.running ? 'Pause' : 'Resume';
+    const breakBtn = document.getElementById('breakBtn');
+    breakBtn.disabled = false;
+    breakBtn.textContent = onBreak ? 'End break' : 'Start break';
+    document.getElementById('breakInput').disabled = onBreak;
+    // Single hook for everything that changes state: keeps the label and the
+    // ring in step without every caller having to remember them.
+    renderTimerLabel(ts);
+    renderTimerRing(ts, currentRemaining(ts), false);
   }
 
   function stopDisplayTicker() {
@@ -539,6 +737,7 @@
     if (!ts.running) { stopDisplayTicker(); return; }
     const remaining = currentRemaining(ts);
     renderTimerDisplay(remaining);
+    renderTimerRing(ts, remaining, true); // the only animated path
     if (remaining <= 0) {
       completeTimer(ts);
     }
@@ -551,32 +750,67 @@
 
   async function completeTimer(ts) {
     stopDisplayTicker();
+    const wasBreak = ts.mode === 'break';
     const minutesElapsed = Math.round(ts.durationSeconds / 60);
-    const freshState = defaultTimerState();
-    freshState.category = ts.category;
-    freshState.durationSeconds = ts.durationSeconds;
-    freshState.remainingAtAnchor = ts.durationSeconds;
+    // Either way we land on a fresh focus session, ready to go again.
+    const freshState = freshFocusState(ts);
     saveTimerState(freshState);
     renderTimerDisplay(freshState.remainingAtAnchor);
     setControlsState(freshState);
-    await logMinutes(ts.category, minutesElapsed);
+    if (!wasBreak) await logMinutes(ts.category, minutesElapsed); // breaks are never logged
   }
 
   function startTimer() {
     const ts = loadTimerState();
-    if (ts.running) return;
-    ts.running = true;
-    ts.anchorTimestamp = Date.now();
-    ts.category = selectedCategory;
-    ts.durationSeconds = durationSeconds;
-    if (ts.remainingAtAnchor !== durationSeconds) {
+    if (ts.running && ts.mode === 'focus') return;
+    // Starting focus during a break simply discards the break.
+    const next = ts.mode === 'break' ? freshFocusState(ts) : ts;
+    next.mode = 'focus';
+    next.running = true;
+    next.anchorTimestamp = Date.now();
+    next.category = selectedCategory;
+    next.durationSeconds = durationSeconds;
+    next.focusDurationSeconds = durationSeconds;
+    if (next.remainingAtAnchor !== durationSeconds) {
       // stale leftover from a different duration setting; treat as fresh
-      ts.remainingAtAnchor = durationSeconds;
+      next.remainingAtAnchor = durationSeconds;
     }
-    saveTimerState(ts);
-    setControlsState(ts);
+    saveTimerState(next);
+    setControlsState(next);
     startDisplayTicker();
-    renderTimerDisplay(currentRemaining(ts));
+    renderTimerDisplay(currentRemaining(next));
+  }
+
+  /* One button, two jobs. Starting a break banks the focus time already done —
+     cutting a session short should never lose the minutes actually worked —
+     then runs the break. Ending one just returns to a fresh focus session. */
+  async function onBreakButton() {
+    const ts = loadTimerState();
+    stopDisplayTicker();
+
+    if (ts.mode === 'break') {
+      const next = freshFocusState(ts);
+      saveTimerState(next);
+      renderTimerDisplay(next.remainingAtAnchor);
+      setControlsState(next);
+      return;
+    }
+
+    const elapsedSeconds = ts.durationSeconds - currentRemaining(ts);
+    const next = defaultTimerState();
+    next.category = ts.category;
+    next.mode = 'break';
+    next.focusDurationSeconds = ts.focusDurationSeconds;
+    next.durationSeconds = breakSeconds;
+    next.remainingAtAnchor = breakSeconds;
+    next.anchorTimestamp = Date.now();
+    next.running = true;
+    saveTimerState(next);
+    renderTimerDisplay(breakSeconds);
+    setControlsState(next);
+    startDisplayTicker();
+    // logMinutes already no-ops at 0, so a barely-started session logs nothing.
+    if (elapsedSeconds > 0) await logMinutes(ts.category, Math.round(elapsedSeconds / 60));
   }
 
   function togglePauseResume() {
@@ -602,11 +836,13 @@
     }
   }
 
+  // Reset always lands on a fresh focus session, ending any break in progress.
   function resetTimer() {
     stopDisplayTicker();
     const ts = defaultTimerState();
     ts.category = selectedCategory;
     ts.durationSeconds = durationSeconds;
+    ts.focusDurationSeconds = durationSeconds;
     ts.remainingAtAnchor = durationSeconds;
     saveTimerState(ts);
     renderTimerDisplay(ts.remainingAtAnchor);
@@ -618,12 +854,29 @@
     const clamped = Math.min(180, Math.max(1, isNaN(val) ? 25 : val));
     durationSeconds = clamped * 60;
     const ts = loadTimerState();
+    if (ts.mode === 'break') {
+      // The focus session is idle behind the break — remember the new length
+      // for when the break ends, but leave the running break alone.
+      ts.focusDurationSeconds = durationSeconds;
+      saveTimerState(ts);
+      return;
+    }
     if (!ts.running && ts.remainingAtAnchor === ts.durationSeconds) {
       ts.durationSeconds = durationSeconds;
+      ts.focusDurationSeconds = durationSeconds;
       ts.remainingAtAnchor = durationSeconds;
       saveTimerState(ts);
       renderTimerDisplay(durationSeconds);
+      setControlsState(ts);
     }
+  }
+
+  function onBreakDurationChange() {
+    const val = parseInt(document.getElementById('breakInput').value, 10);
+    const clamped = Math.min(60, Math.max(1, isNaN(val) ? 5 : val));
+    document.getElementById('breakInput').value = clamped;
+    breakSeconds = clamped * 60;
+    saveBreakMinutes(clamped);
   }
 
   let pendingCompletion = null; // a finished session waiting for login status before it's safely logged
@@ -633,10 +886,14 @@
   function displayTimerFromLocal() {
     const ts = loadTimerState();
     selectedCategory = ts.category || 'productivity';
-    durationSeconds = ts.durationSeconds || 25 * 60;
+    // Read the FOCUS length here, not ts.durationSeconds — during a break the
+    // latter holds the break length and would clobber the focus setting.
+    durationSeconds = ts.focusDurationSeconds || 25 * 60;
+    breakSeconds = loadBreakMinutes() * 60;
     document.getElementById('durationInput').value = Math.round(durationSeconds / 60);
+    document.getElementById('breakInput').value = Math.round(breakSeconds / 60);
     renderCategoryRow();
-    renderTimerLabel();
+    renderTimerLabel(ts);
 
     if (ts.running) {
       const remaining = currentRemaining(ts);
@@ -646,9 +903,11 @@
         // get silently overwritten by a stale server pull.
         stopDisplayTicker();
         renderTimerDisplay(0);
+        renderTimerRing(ts, 0, false);
         document.getElementById('startBtn').disabled = true;
         document.getElementById('pauseBtn').disabled = true;
         document.getElementById('resetBtn').disabled = true;
+        document.getElementById('breakBtn').disabled = true;
         pendingCompletion = ts;
       } else {
         renderTimerDisplay(remaining);
@@ -828,6 +1087,10 @@
     document.getElementById('pauseBtn').addEventListener('click', togglePauseResume);
     document.getElementById('resetBtn').addEventListener('click', resetTimer);
     document.getElementById('durationInput').addEventListener('change', onDurationChange);
+    document.getElementById('breakBtn').addEventListener('click', onBreakButton);
+    document.getElementById('breakInput').addEventListener('change', onBreakDurationChange);
+
+    initTimerRing(); // measure the card before anything tries to draw the ring
 
     // Show the timer right away from local data — this never waits on login/network.
     displayTimerFromLocal();
@@ -874,9 +1137,12 @@
       currentUser = user;
       renderAuthLoggedIn(user);
       netlifyIdentity.close();
-      await pullFromServer();
+      const pulled = await pullFromServer();
       await finishInitialLoad();
-      await pushToServer();
+      /* Only upload when the download succeeded AND this device actually has
+         something to contribute. Either guard alone is not enough. */
+      if (pulled && hasLocalData()) await pushToServer();
+      renderSyncNote();
     });
 
     netlifyIdentity.on('logout', () => {

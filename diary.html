@@ -288,6 +288,7 @@
 
   let currentUser = null;
   let syncing = false;
+  let syncFailed = false;
   let viewYear, viewMonth; // 0-indexed month
   let selectedDate = new Date();
   let diaryEntries = {}; // { 'YYYY-MM-DD': { title, rating, text } }
@@ -351,15 +352,29 @@
     });
   }
 
+  function hasLocalDiaryData() {
+    return Object.keys(collectDiaryHistory()).length > 0;
+  }
+
+  /* Returns true only if the download actually completed. Callers MUST check
+     this before uploading: pushing after a failed download would overwrite the
+     server copy with whatever this device happens to hold, which may be nothing
+     (e.g. a brand new browser, or a fresh domain — localStorage is per-domain). */
   async function pullDiaryFromServer() {
-    if (!currentUser) return;
+    if (!currentUser) return false;
     try {
       const token = await currentUser.jwt();
       const res = await fetch(DIARY_FUNCTION_URL, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) return;
+      if (!res.ok) { syncFailed = true; return false; }
       const serverHistory = await res.json();
       writeDiaryHistoryToLocal(serverHistory);
-    } catch (e) { console.error('Diary pull failed', e); }
+      syncFailed = false;
+      return true;
+    } catch (e) {
+      console.error('Diary pull failed', e);
+      syncFailed = true;
+      return false;
+    }
   }
 
   async function pushDiaryToServer() {
@@ -369,13 +384,15 @@
     try {
       const token = await currentUser.jwt();
       const history = collectDiaryHistory();
-      await fetch(DIARY_FUNCTION_URL, {
+      const res = await fetch(DIARY_FUNCTION_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(history),
       });
+      syncFailed = !res.ok;
     } catch (e) {
       console.error('Diary push failed', e);
+      syncFailed = true;
     } finally {
       syncing = false;
       renderSyncNote();
@@ -402,6 +419,7 @@
     if (!el) return;
     if (!currentUser) el.textContent = 'Not synced — log in to save across devices';
     else if (syncing) el.textContent = 'Syncing…';
+    else if (syncFailed) el.textContent = '⚠ Sync failed — this device’s data is safe, but not saved to your account';
     else el.textContent = 'Synced to your account';
   }
 
@@ -633,14 +651,17 @@
       currentUser = user;
       renderAuthLoggedIn(user);
       netlifyIdentity.close();
-      await pullDiaryFromServer();
+      const pulled = await pullDiaryFromServer();
       await pullPomodoroFromServer();
       loadDiaryLocal();
       loadPomodoroLocal();
       renderCalendar();
       renderEntryPanel();
       renderPomodoroMini();
-      await pushDiaryToServer();
+      /* Only upload when the download succeeded AND this device actually has
+         something to contribute. Either guard alone is not enough. */
+      if (pulled && hasLocalDiaryData()) await pushDiaryToServer();
+      renderSyncNote();
     });
 
     netlifyIdentity.on('logout', () => {

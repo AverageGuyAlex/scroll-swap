@@ -331,6 +331,7 @@
   let streak = 0;
   let currentUser = null;
   let syncing = false;
+  let syncFailed = false;
 
   function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -446,18 +447,30 @@
     });
   }
 
+  function hasLocalData() {
+    return Object.keys(collectAllLocalHistory()).length > 0;
+  }
+
+  /* Returns true only if the download actually completed. Callers MUST check
+     this before uploading: pushing after a failed download would overwrite the
+     server copy with whatever this device happens to hold, which may be nothing
+     (e.g. a brand new browser, or a fresh domain — localStorage is per-domain). */
   async function pullFromServer() {
-    if (!currentUser) return;
+    if (!currentUser) return false;
     try {
       const token = await currentUser.jwt();
       const res = await fetch(FUNCTION_URL, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return;
+      if (!res.ok) { syncFailed = true; return false; }
       const serverHistory = await res.json();
       writeHistoryToLocal(serverHistory);
+      syncFailed = false;
+      return true;
     } catch (e) {
       console.error('Pull failed', e);
+      syncFailed = true;
+      return false;
     }
   }
 
@@ -468,7 +481,7 @@
     try {
       const token = await currentUser.jwt();
       const history = collectAllLocalHistory();
-      await fetch(FUNCTION_URL, {
+      const res = await fetch(FUNCTION_URL, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -476,8 +489,10 @@
         },
         body: JSON.stringify(history),
       });
+      syncFailed = !res.ok;
     } catch (e) {
       console.error('Push failed', e);
+      syncFailed = true;
     } finally {
       syncing = false;
       renderSyncNote();
@@ -491,6 +506,8 @@
       el.textContent = 'Not synced — log in to save across devices';
     } else if (syncing) {
       el.textContent = 'Syncing…';
+    } else if (syncFailed) {
+      el.textContent = '⚠ Sync failed — this device’s data is safe, but not saved to your account';
     } else {
       el.textContent = '✓ Synced to your account';
     }
@@ -753,12 +770,15 @@
       currentUser = user;
       renderAuthLoggedIn(user);
       netlifyIdentity.close();
-      await pullFromServer();
+      const pulled = await pullFromServer();
       loadToday();
       loadLabelsLocal();
       computeStreak();
       renderTracker();
-      await pushToServer();
+      /* Only upload when the download succeeded AND this device actually has
+         something to contribute. Either guard alone is not enough. */
+      if (pulled && hasLocalData()) await pushToServer();
+      renderSyncNote();
     });
 
     netlifyIdentity.on('logout', () => {
