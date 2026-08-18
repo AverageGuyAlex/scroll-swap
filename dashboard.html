@@ -14,15 +14,15 @@
 <link rel="apple-touch-icon" sizes="512x512" href="/assets/app-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%236C5CE7'/%3E%3Crect x='45' y='45' width='40' height='40' rx='10' fill='%23FFFFFF'/%3E%3Crect x='95' y='45' width='40' height='40' rx='10' fill='none' stroke='%23FFFFFF' stroke-width='6'/%3E%3Crect x='45' y='95' width='40' height='40' rx='10' fill='none' stroke='%23FFFFFF' stroke-width='6'/%3E%3Crect x='95' y='95' width='40' height='40' rx='10' fill='%23FFFFFF'/%3E%3C/svg%3E">
 
-<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}</script>
+<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=1">
+<link rel="stylesheet" href="/css/rotulus.css?v=2">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=1"></script>
+<script defer src="/js/rotulus-shared.js?v=2"></script>
 
 <style>
   /* Page-specific: dashboard */
@@ -81,23 +81,64 @@
     color: var(--ink-dim);
     line-height: 1.4;
     margin: 0;
+    /* Row rather than a plain line so the chevron can sit at the far end,
+       hinting that the whole card opens the page the number came from. */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
   }
+  .stat-go { font-size: 14px; font-weight: 700; opacity: 0.5; flex-shrink: 0; }
 
-  /* Locked-in pill */
+  /* Locked-in pill. It's a button, not a label: tapping it offers to start a
+     session. Lock In is a full-screen dark mode with no way back except a tap,
+     so it asks first rather than dropping you in on a mis-tap. */
+  .lockin-area { margin-bottom: 20px; }
   .lockin-note-card {
+    display: block;
+    width: 100%;
     background: var(--acc-green-soft);
     border: 1px solid transparent;
     border-radius: var(--r-pill);
     padding: 11px 16px;
-    margin-bottom: 20px;
     text-align: center;
+    cursor: pointer;
   }
+  /* display:block above beats the UA [hidden]{display:none} rule, so the
+     hidden attribute needs saying again here or the pill stays on screen
+     underneath the confirm. */
+  .lockin-note-card[hidden] { display: none; }
   .lockin-note-text {
     font-weight: 700;
     font-size: 12.5px;
     color: var(--green);
     margin: 0;
   }
+
+  .lockin-confirm {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    padding: 14px 16px;
+  }
+  .lockin-confirm[hidden] { display: none; }
+  .lockin-confirm-text {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+    text-align: center;
+    margin: 0 0 12px;
+  }
+  .lockin-confirm-row { display: flex; gap: 8px; }
+  /* Same two-button pattern the to-do page uses for its inline forms. */
+  .inline-btn {
+    font-family: var(--font-body); font-weight: 800; font-size: 11px;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    border: none; border-radius: var(--r-pill); padding: 10px 14px; cursor: pointer;
+  }
+  .inline-btn.confirm { background: var(--green); color: #FFFFFF; flex: 1; }
+  .inline-btn.cancel { background: transparent; color: var(--ink-dim); border: 1px solid var(--line); }
 
   /* Chart section */
   .chart-section-title {
@@ -174,20 +215,10 @@
 <body>
 <div id="app">
   <div class="nav-row">
-    <button class="nav-btn" id="navToggle" aria-label="Menu">&#9776;</button>
-    <div class="nav-dropdown" id="navDropdown">
-      <a href="index.html" class="nav-link">Rotulus</a>
-      <a href="dashboard.html" class="nav-link active">Dashboard</a>
-      <a href="goals.html" class="nav-link">Goals</a>
-      <a href="lock-in.html" class="nav-link">Lock In</a>
-      <a href="pomodoro.html" class="nav-link">Pomodoro</a>
-      <a href="diary.html" class="nav-link">Diary</a>
-      <a href="todo.html" class="nav-link">To-Do</a>
-      <a href="settings.html" class="nav-link">Settings</a>
-    </div>
     <button class="gear-btn" id="gearToggle" title="Settings" aria-label="Settings">&#9881;</button>
     <div class="gear-dropdown" id="gearDropdown">
       <div id="gearAccountSection"></div>
+      <a href="lock-in.html" class="gear-settings-link">&#128274; Lock In</a>
       <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
     </div>
   </div>
@@ -210,8 +241,17 @@
 
   <div class="stats-grid" id="statsGrid"></div>
 
-  <div class="lockin-note-card">
-    <p class="lockin-note-text" id="lockInNote"></p>
+  <div class="lockin-area">
+    <button class="lockin-note-card" id="lockInBtn" type="button">
+      <span class="lockin-note-text" id="lockInNote"></span>
+    </button>
+    <div class="lockin-confirm" id="lockInConfirm" hidden>
+      <p class="lockin-confirm-text">Start a Lock In session?</p>
+      <div class="lockin-confirm-row">
+        <button class="inline-btn cancel" id="lockInCancelBtn" type="button">Cancel</button>
+        <button class="inline-btn confirm" id="lockInStartBtn" type="button">Start</button>
+      </div>
+    </div>
   </div>
 
   <p class="chart-section-title">Pomodoro balance</p>
@@ -438,41 +478,69 @@
     const goalsStats = getGoalsStats();
     const lockInMinutes = getLockInMinutes();
 
-    /* Placeholder glyphs — future swap point: replace the emoji with
+    /* Each card links to the page its number came from, so a stat is a door
+       rather than a dead end. The two with a #hash land on the exact thing
+       they counted — todo.html opens its completed archive, goals.html scrolls
+       to the first completed goal.
+       Placeholder glyphs — future swap point: replace the emoji with
        <img src="/assets/icons/stat-*.png"> inside .stat-icon. */
     const grid = document.getElementById('statsGrid');
     grid.innerHTML = `
-      <div class="stat-card" style="--acc:var(--acc-sky); --acc-soft:var(--acc-sky-soft);">
+      <a class="stat-card stat-card-link" href="todo.html#archive" style="--acc:var(--acc-sky); --acc-soft:var(--acc-sky-soft);">
         <div class="stat-top">
           <div class="icon-tile stat-icon">&#10004;&#65039;</div>
           <p class="stat-num">${todoStats.totalCompleted}</p>
         </div>
-        <p class="stat-label">Tasks completed</p>
-      </div>
-      <div class="stat-card" style="--acc:var(--acc-orange); --acc-soft:var(--acc-orange-soft);">
+        <p class="stat-label">Tasks completed<span class="stat-go">&rsaquo;</span></p>
+      </a>
+      <a class="stat-card stat-card-link" href="pomodoro.html" style="--acc:var(--acc-orange); --acc-soft:var(--acc-orange-soft);">
         <div class="stat-top">
           <div class="icon-tile stat-icon">&#9201;</div>
           <p class="stat-num">${pomodoroMinutes}</p>
         </div>
-        <p class="stat-label">Pomodoro minutes</p>
-      </div>
-      <div class="stat-card" style="--acc:var(--acc-green); --acc-soft:var(--acc-green-soft);">
+        <p class="stat-label">Pomodoro minutes<span class="stat-go">&rsaquo;</span></p>
+      </a>
+      <a class="stat-card stat-card-link" href="goals.html" style="--acc:var(--acc-green); --acc-soft:var(--acc-green-soft);">
         <div class="stat-top">
           <div class="icon-tile stat-icon">&#127919;</div>
           <p class="stat-num">${goalsStats.totalHours}</p>
         </div>
-        <p class="stat-label">Hours on goals</p>
-      </div>
-      <div class="stat-card" style="--acc:var(--acc-purple); --acc-soft:var(--acc-purple-soft);">
+        <p class="stat-label">Hours on goals<span class="stat-go">&rsaquo;</span></p>
+      </a>
+      <a class="stat-card stat-card-link" href="goals.html#completed" style="--acc:var(--acc-purple); --acc-soft:var(--acc-purple-soft);">
         <div class="stat-top">
           <div class="icon-tile stat-icon">&#127942;</div>
           <p class="stat-num">${goalsStats.completedGoals}</p>
         </div>
-        <p class="stat-label">Goals completed</p>
-      </div>
+        <p class="stat-label">Goals completed<span class="stat-go">&rsaquo;</span></p>
+      </a>
     `;
 
     document.getElementById('lockInNote').textContent = `\u{1F512} You have been locked in for ${lockInMinutes} minutes`;
+  }
+
+  // ---- Lock In confirm ----
+
+  /* Lock In is a full-screen, always-dark focus mode that starts counting the
+     moment it opens, so the pill asks before it takes you there. */
+  function initLockInConfirm() {
+    const pill = document.getElementById('lockInBtn');
+    const confirmBox = document.getElementById('lockInConfirm');
+    const cancelBtn = document.getElementById('lockInCancelBtn');
+    const startBtn = document.getElementById('lockInStartBtn');
+    if (!pill || !confirmBox) return;
+
+    pill.addEventListener('click', () => {
+      pill.hidden = true;
+      confirmBox.hidden = false;
+    });
+    cancelBtn.addEventListener('click', () => {
+      confirmBox.hidden = true;
+      pill.hidden = false;
+    });
+    startBtn.addEventListener('click', () => {
+      window.location.href = 'lock-in.html';
+    });
   }
 
   // ---- Pie chart ----
@@ -575,6 +643,7 @@
     renderStats();
     renderChart();
     initChartToggle();
+    initLockInConfirm();
   }
 
   function initIdentity() {

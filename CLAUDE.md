@@ -102,12 +102,14 @@ and the pie chart.
 - **`css/rotulus.css`** — all shared tokens (colors, radii, shadows, motion,
   fonts) and shared components (nav, dropdowns, header, auth card, buttons,
   pills, card/background layer, animations, reduced-motion). Linked from
-  every page as `<link rel="stylesheet" href="/css/rotulus.css?v=1">`.
+  every page as `<link rel="stylesheet" href="/css/rotulus.css?v=2">`.
   Page-specific CSS (timer digits, calendar grid, goal cards, etc.) stays
   inline in each page's own `<style>` block.
-- **`js/rotulus-shared.js`** — theme apply/toggle and nav/gear dropdown
-  logic, loaded with `defer` on every page. Exposes `window.rotulus.applyTheme(theme)`
-  and `window.rotulus.getTheme()`. Don't re-duplicate this logic per-page.
+- **`js/rotulus-shared.js`** — theme apply/toggle, the gear dropdown, and the
+  bottom tab bar + swipe navigation (see Navigation below). Loaded with
+  `defer` on every page except `lock-in.html`. Exposes
+  `window.rotulus.applyTheme(theme)` and `window.rotulus.getTheme()`.
+  Don't re-duplicate this logic per-page.
 - **Bump `?v=` on `rotulus.css`/`rotulus-shared.js` links whenever you edit
   them** — `netlify.toml` sets `no-cache` on `/css/*` and `/js/*` (this app
   was bitten before by stale-CSS bugs from aggressive browser caching).
@@ -136,6 +138,52 @@ and the pie chart.
   **optimistic UI** — flip the class immediately, run localStorage
   save/server sync after — so taps never feel laggy waiting on a re-render
   or network round trip.
+
+## Navigation (bottom tab bar, swipe, deep links)
+
+The old hamburger + 8-item dropdown is gone. Page switching is a fixed bottom
+tab bar, and the gear button (top right) holds the things that aren't places
+you spend time: **Lock In, Settings, account/logout**.
+
+- **`TABS` in `js/rotulus-shared.js` is the single source of truth** — tab
+  order, labels, icons, the swipe order, the prefetch targets and the active
+  highlight all read that one array. Add or reorder a tab there and nothing
+  else needs touching. The bar is injected into `<body>` on
+  `DOMContentLoaded`; the gear menu stays hardcoded per page so Settings and
+  Lock In survive a JS failure.
+- Six tabs: Home, To-Do, Pomodoro, Goals, Diary, Dashboard. `settings.html`
+  shows the bar with **nothing active** and is not in the swipe order.
+  `lock-in.html` loads neither the shared CSS nor JS, so the focus screen
+  stays bare by construction — keep it that way.
+- **Swipe left/right moves one tab**, no wrap-around at the ends. It is
+  ignored when the gesture starts in the 24px screen-edge zone (that's the
+  OS back-swipe), on an `input`/`textarea`/`select`/`[contenteditable]`/
+  `[data-no-swipe]`, when a second finger lands, when it's slower than 600ms,
+  shorter than 60px, or more vertical than horizontal. **Put
+  `data-no-swipe` on any new horizontally-draggable control.**
+- **Page-to-page animation is the browser's cross-document View Transitions**
+  (`@view-transition { navigation: auto; }` in `rotulus.css`), not JS —
+  nothing calls `startViewTransition()`. Below iOS 18.2 / Chrome 126 the app
+  just navigates with no animation, which is a fine fallback.
+  Direction comes from `data-vt-dir` on `<html>`, written **before first
+  paint** by the pre-paint `<head>` snippet from a `sessionStorage`
+  `rotulus_vt_dir` key that the swipe sets. Tapping a tab deliberately leaves
+  it unset, which gives a cross-fade. Copy that whole two-statement head
+  snippet exactly when adding a page.
+- `netlify.toml` serves HTML as `no-cache` (revalidate) rather than
+  `no-store`, so a swipe gets a `304` instead of re-downloading the page, and
+  the two neighbouring tabs can be `rel="prefetch"`ed. It still revalidates
+  every load, so a page can never go stale. `/css/*` and `/js/*` stay
+  `no-store` — bump `?v=` there instead.
+- **Dashboard stat cards are links** into the page their number came from.
+  Two carry a hash the target page acts on: `todo.html#archive` opens the
+  completed-tasks archive through the real toggle button (so `archiveOpen`
+  and the label stay in step), and `goals.html#completed` scrolls to the
+  first completed goal and pulses it. Both fire **after the render that
+  follows the login pull**, never on the first local render — on a synced
+  device the pull replaces everything underneath. The "locked in for X
+  minutes" pill asks before entering Lock In, since Lock In is full-screen
+  and starts counting immediately.
 
 ## Image assets (`assets/` folder)
 
@@ -174,6 +222,12 @@ will keep serving the old one.
   push changes, clone `AverageGuyAlex/scroll-swap` fresh to a temp location,
   copy changed/new files over, commit, and push from there — don't `git init`
   in place (would lose history / diverge from the real repo).
+- **Line-ending trap when committing:** the GitHub repo stores files with
+  **CRLF**, this folder is **LF**. Copying edited files straight into a fresh
+  clone marks every line of every file as changed and makes the diff
+  unreviewable. Copy only the files actually edited, then convert them with
+  `perl -pi -e 's/(?<!\r)\n\z/\r\n/' <file>`. Check `git diff --stat` before
+  committing — a sane diff is tens of lines, not thousands.
 - The user generates mockups/images themselves (AI-generated) and supplies
   them on request — when a design needs an asset, list exact filenames and
   dimensions and wait for them to drop the files in.

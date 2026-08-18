@@ -14,15 +14,15 @@
 <link rel="apple-touch-icon" sizes="512x512" href="/assets/app-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%236C5CE7'/%3E%3Ccircle cx='90' cy='90' r='34' fill='none' stroke='%23FFFFFF' stroke-width='8'/%3E%3Ccircle cx='90' cy='90' r='8' fill='%23FFFFFF'/%3E%3C/svg%3E">
 
-<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}</script>
+<script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=1">
+<link rel="stylesheet" href="/css/rotulus.css?v=2">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=1"></script>
+<script defer src="/js/rotulus-shared.js?v=2"></script>
 
 <style>
   /* Page-specific: goals */
@@ -156,20 +156,10 @@
 <body>
 <div id="app">
   <div class="nav-row">
-    <button class="nav-btn" id="navToggle" aria-label="Menu">&#9776;</button>
-    <div class="nav-dropdown" id="navDropdown">
-      <a href="index.html" class="nav-link">Rotulus</a>
-      <a href="dashboard.html" class="nav-link">Dashboard</a>
-      <a href="goals.html" class="nav-link active">Goals</a>
-      <a href="lock-in.html" class="nav-link">Lock In</a>
-      <a href="pomodoro.html" class="nav-link">Pomodoro</a>
-      <a href="diary.html" class="nav-link">Diary</a>
-      <a href="todo.html" class="nav-link">To-Do</a>
-      <a href="settings.html" class="nav-link">Settings</a>
-    </div>
     <button class="gear-btn" id="gearToggle" title="Settings" aria-label="Settings">&#9881;</button>
     <div class="gear-dropdown" id="gearDropdown">
       <div id="gearAccountSection"></div>
+      <a href="lock-in.html" class="gear-settings-link">&#128274; Lock In</a>
       <a href="settings.html" class="gear-settings-link">&#9881; Settings</a>
     </div>
   </div>
@@ -653,9 +643,35 @@
     renderGoals();
   }
 
+
+  /* Landing for the dashboard's "Goals completed" card, which links here as
+     goals.html#completed. Goals aren't filtered or reordered — completed ones
+     sit inline in the list — so this scrolls to the first finished goal and
+     pulses it. No completed goals means no scroll and no message; the page is
+     already showing the honest answer. */
+  let completedScrolled = false;
+
+  function applyCompletedDeepLink() {
+    if (completedScrolled || window.location.hash !== '#completed') return;
+
+    const cards = Array.from(document.querySelectorAll('.goal-card'));
+    const card = cards.find(el => {
+      const goal = state.goals.find(g => g.id === el.dataset.goalId);
+      return goal && goal.completed;
+    });
+    if (!card) return;
+
+    completedScrolled = true;
+    requestAnimationFrame(() => {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('flash-highlight');
+    });
+  }
+
   function initIdentity() {
     if (typeof netlifyIdentity === 'undefined') {
       document.getElementById('authCard').innerHTML = '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      applyCompletedDeepLink();
       return;
     }
     netlifyIdentity.on('init', async user => {
@@ -665,6 +681,7 @@
       loadLocal();
       renderGoals();
       renderSyncNote();
+      applyCompletedDeepLink();
     });
     netlifyIdentity.on('login', async user => {
       currentUser = user;
@@ -677,6 +694,7 @@
          something to contribute. Either guard alone is not enough. */
       if (pulled && hasLocalData()) await pushToServer();
       renderSyncNote();
+      applyCompletedDeepLink();
     });
     netlifyIdentity.on('logout', () => { currentUser = null; renderAuthLoggedOut(); renderSyncNote(); });
     netlifyIdentity.on('signup', async user => { currentUser = user; renderAuthLoggedIn(user); await pushToServer(); });

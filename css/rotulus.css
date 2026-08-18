@@ -149,7 +149,9 @@ body::before {
   font-family: var(--font-body);
   color: var(--ink);
   background: transparent;
-  padding: 8px 22px 40px;
+  /* Bottom padding clears the fixed .tabbar (56px tall) plus the iPhone home
+     indicator, so the last card on a page is never trapped behind the bar. */
+  padding: 8px 22px calc(76px + env(safe-area-inset-bottom));
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
@@ -185,26 +187,81 @@ a { touch-action: manipulation; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+  /* View-transition pseudo-elements aren't matched by the * rule above, so
+     they need silencing by name — otherwise page changes still slide. */
+  ::view-transition-group(*),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
 }
 
 /* ==========================================================================
-   Nav row: round floating menu + gear buttons, animated dropdowns
+   Cross-document view transitions (page-to-page slide)
+   --------------------------------------------------------------------------
+   Rotulus is a multi-page app, so switching tab is a real navigation. The
+   browser animates between the two documents natively; browsers without
+   support (below iOS 18.2 / Chrome 126) simply navigate with no animation,
+   which is a fine fallback rather than a broken one.
+
+   Direction comes from data-vt-dir on <html>, written before first paint by
+   the pre-paint snippet in each page's <head> from a sessionStorage key that
+   js/rotulus-shared.js sets just before a swipe navigates. A tap on a tab
+   leaves it unset on purpose, which gives the default cross-fade.
+   ========================================================================== */
+
+@view-transition { navigation: auto; }
+
+@keyframes vt-slide-from-right { from { transform: translateX(100%); } }
+@keyframes vt-slide-to-left    { to   { transform: translateX(-30%); opacity: 0.4; } }
+@keyframes vt-slide-from-left  { from { transform: translateX(-100%); } }
+@keyframes vt-slide-to-right   { to   { transform: translateX(30%); opacity: 0.4; } }
+
+/* Swiped left (moving one tab further along the bar). */
+html[data-vt-dir="forward"]::view-transition-old(root) {
+  animation: vt-slide-to-left var(--t-med) var(--ease) both;
+}
+html[data-vt-dir="forward"]::view-transition-new(root) {
+  animation: vt-slide-from-right var(--t-med) var(--ease) both;
+}
+
+/* Swiped right (moving back towards Home). */
+html[data-vt-dir="back"]::view-transition-old(root) {
+  animation: vt-slide-to-right var(--t-med) var(--ease) both;
+}
+html[data-vt-dir="back"]::view-transition-new(root) {
+  animation: vt-slide-from-left var(--t-med) var(--ease) both;
+}
+
+/* The two snapshots must sit on top of each other while they slide, not
+   blend, or the outgoing page ghosts through the incoming one. */
+html[data-vt-dir]::view-transition-old(root),
+html[data-vt-dir]::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+
+/* ==========================================================================
+   Nav row: the gear button and its dropdown
+   --------------------------------------------------------------------------
+   The hamburger and its 8-item dropdown are gone — page switching lives in
+   the bottom .tabbar now. The gear stays as the home for the things that
+   aren't places you spend time: Lock In, Settings and the account.
    ========================================================================== */
 
 .nav-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 14px;
   position: relative;
 }
 
-.nav-btn, .gear-btn {
+.gear-btn {
   width: 42px;
   height: 42px;
   border-radius: 50%;
   background: var(--card);
-  color: var(--ink);
+  color: var(--ink-dim);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-card);
   cursor: pointer;
@@ -214,11 +271,13 @@ a { touch-action: manipulation; }
   font-size: 17px;
   padding: 0;
 }
-.gear-btn { color: var(--ink-dim); }
 
-.nav-dropdown, .gear-dropdown {
+.gear-dropdown {
   position: absolute;
   top: 50px;
+  right: 0;
+  min-width: 220px;
+  padding: 14px 16px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -236,10 +295,8 @@ a { touch-action: manipulation; }
     transform var(--t-med) var(--ease),
     visibility 0s linear var(--t-med);
 }
-.nav-dropdown { left: 0; min-width: 200px; }
-.gear-dropdown { right: 0; min-width: 220px; padding: 14px 16px; }
 
-.nav-dropdown.open, .gear-dropdown.open {
+.gear-dropdown.open {
   opacity: 1;
   visibility: visible;
   transform: none;
@@ -248,22 +305,6 @@ a { touch-action: manipulation; }
     opacity var(--t-med) var(--ease),
     transform var(--t-med) var(--ease);
 }
-
-.nav-link {
-  display: block;
-  padding: 12px 16px;
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--ink-dim);
-  text-decoration: none;
-  border-bottom: 1px solid var(--line);
-  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
-}
-.nav-link:last-child { border-bottom: none; }
-.nav-link.active { color: var(--primary); background: var(--primary-soft); }
-.nav-link.disabled { opacity: 0.4; pointer-events: none; }
-.nav-link:active { background: var(--primary-soft); }
 
 .gear-status {
   font-family: var(--font-body);
@@ -508,3 +549,102 @@ a { touch-action: manipulation; }
   color: var(--ink-dim);
   text-align: center;
 }
+
+/* ==========================================================================
+   Bottom tab bar
+   --------------------------------------------------------------------------
+   Injected into every page by js/rotulus-shared.js (see the TABS array there
+   — it is the single source of truth for order, labels and icons). Fixed to
+   the bottom so it stays under the thumb, and width-matched to #app so it
+   lines up with the content on wide screens instead of stretching edge to
+   edge. lock-in.html never loads this stylesheet, so the focus screen stays
+   completely bare.
+   ========================================================================== */
+
+.tabbar {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 20;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  box-shadow: var(--shadow-float);
+}
+
+/* Let content scroll softly under the bar where the browser supports it. */
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .tabbar {
+    background: color-mix(in srgb, var(--card) 82%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 2px 5px;
+  border-radius: 14px;
+  color: var(--ink-dim);
+  text-decoration: none;
+  transition:
+    color var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+.tab:active { transform: scale(0.94); }
+
+.tab-icon-wrap { display: flex; align-items: center; justify-content: center; }
+.tab-icon { width: 22px; height: 22px; display: block; }
+
+.tab-label {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Same active treatment the old nav links used: primary ink on a soft pill. */
+.tab.active {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+/* ==========================================================================
+   Dashboard stat cards as links, and the deep-link landing flash
+   ========================================================================== */
+
+/* Stat cards navigate to the page their number came from, so they need to
+   read as pressable — same scale-down feedback every button in the app uses. */
+.stat-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+.stat-card-link:active { transform: scale(0.96); }
+
+/* Brief pulse on whatever a deep link scrolled you to, so it is obvious
+   which row on the page answered the number you tapped. */
+@keyframes rotulus-flash {
+  0%   { box-shadow: 0 0 0 0 var(--primary-soft); }
+  35%  { box-shadow: 0 0 0 5px var(--primary-soft); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.flash-highlight { animation: rotulus-flash 1.2s var(--ease) 1; }
