@@ -88,18 +88,22 @@
       icon: SVG + '<path d="M5 20v-6.4M12 20V4.6M19 20v-9.2"/></svg>' },
   ];
 
-  function currentFile() {
+  /* Netlify's pretty URLs serve the same page at /goals and /goals.html, and
+     the home page at /. Match on the bare name so the bar highlights and the
+     swipe works whichever form the URL took — landing on /goals used to leave
+     the bar with nothing active and the swipe completely dead. */
+  function currentPageName() {
     var path = location.pathname;
     var file = path.substring(path.lastIndexOf('/') + 1).toLowerCase();
-    return file || 'index.html';
+    return file.replace(/\.html$/, '') || 'index';
   }
 
   function currentTabIndex() {
-    var file = currentFile();
+    var name = currentPageName();
     for (var i = 0; i < TABS.length; i++) {
-      if (TABS[i].file === file) return i;
+      if (TABS[i].file.replace(/\.html$/, '') === name) return i;
     }
-    return -1; // settings.html and anything else: bar shows, nothing active
+    return -1; // settings and anything else: bar shows, nothing active
   }
 
   function buildTabBar() {
