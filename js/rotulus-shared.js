@@ -141,18 +141,36 @@
 
   /* ------------------------------------------------------------ swipe nav */
 
-  /* Rotulus is a multi-page app, so a swipe is a real navigation rather than a
-     slide inside one shell. The directional animation is handed to the
-     browser's cross-document View Transitions: we stash which way we are going
-     in sessionStorage, and the next page's pre-paint <head> snippet reads it
-     into data-vt-dir before first paint. Tapping a tab deliberately leaves the
-     key unset, which gives a plain cross-fade instead of a slide. */
-  var EDGE_GUARD = 24;     // px: leave the OS back-swipe zone alone
-  var MIN_DISTANCE = 60;   // px of horizontal travel before it counts
-  var MAX_DURATION = 600;  // ms: a slow drag is not a swipe
+  /* A drag, not a flick-and-guess. #app tracks the finger 1:1, resists at the
+     ends of the tab list, and on release either springs back or flings the
+     rest of the way and navigates.
+
+     Rotulus is a multi-page app, so committing a drag is a real navigation.
+     By the time we navigate #app is already off-screen, so the outgoing
+     snapshot is nothing but the shared blob background — rotulus.css holds it
+     still and slides the incoming page in over it, which reads as one
+     continuous motion. Direction rides in sessionStorage and is read into
+     data-vt-dir by the next page's pre-paint <head> snippet. Tapping a tab
+     deliberately leaves the key unset, giving a plain cross-fade.
+
+     The gesture never calls preventDefault(): #app carries
+     touch-action: pan-y, so the browser keeps vertical scrolling and hands us
+     horizontal movement without a fight. That keeps every listener passive. */
+  var EDGE_GUARD = 24;        // px: leave the OS back-swipe zone alone
+  var LOCK_SLOP = 10;         // px of travel before we decide the axis
+  var COMMIT_FRACTION = 0.30; // of viewport width
+  var FLICK_VELOCITY = 0.5;   // px/ms — a fast throw commits from further back
+  var FLICK_FRACTION = 0.15;  // ...but it still has to have gone somewhere
+  var END_RESISTANCE = 0.3;   // rubber band past the first/last tab
   var NO_SWIPE_SEL = 'input, textarea, select, [contenteditable], [data-no-swipe]';
 
-  var swipe = null;
+  var drag = null;
+  var appEl = null;
+
+  function app() {
+    if (!appEl) appEl = document.getElementById('app');
+    return appEl;
+  }
 
   function navigateTo(index, dir) {
     var tab = TABS[index];
@@ -161,47 +179,133 @@
     location.href = tab.file;
   }
 
-  function swipeBlocked() {
+  function setOffset(px) {
+    var el = app();
+    if (el) el.style.transform = 'translate3d(' + px + 'px, 0, 0)';
+  }
+
+  function clearDragStyles(el) {
+    el.style.transition = '';
+    el.style.transform = '';
+    el.style.willChange = '';
+  }
+
+  /* Ease back to rest. Kept off the compositor hints once it lands so the page
+     isn't left permanently promoted to its own layer. */
+  function springBack() {
+    var el = app();
+    if (!el) return;
+    el.style.transition = 'transform 0.24s cubic-bezier(0.2, 0.9, 0.3, 1)';
+    setOffset(0);
+    setTimeout(function () { clearDragStyles(el); }, 260);
+  }
+
+  function commit(index, dir, velocity) {
+    var el = app();
+    var width = window.innerWidth || document.documentElement.clientWidth;
+    if (!el) { navigateTo(index, dir); return; }
+    // Match the fling to how hard it was thrown, within sane bounds.
+    var ms = Math.max(120, Math.min(220, 180 / Math.max(0.5, velocity)));
+    el.style.transition = 'transform ' + ms + 'ms cubic-bezier(0.3, 0, 0.2, 1)';
+    setOffset(dir === 'forward' ? -width : width);
+    setTimeout(function () { navigateTo(index, dir); }, ms);
+  }
+
+  function gestureBlocked() {
     if (document.querySelector('.gear-dropdown.open')) return true;
     var el = document.activeElement;
     return !!(el && el.closest && el.closest(NO_SWIPE_SEL));
   }
 
   document.addEventListener('touchstart', function (e) {
-    if (e.touches.length !== 1) { swipe = null; return; }
+    if (e.touches.length !== 1) { drag = null; return; }
+    if (currentTabIndex() === -1) return; // settings isn't in the swipe order
     var t = e.touches[0];
     var width = window.innerWidth || document.documentElement.clientWidth;
-    if (t.clientX < EDGE_GUARD || t.clientX > width - EDGE_GUARD) { swipe = null; return; }
-    if (e.target && e.target.closest && e.target.closest(NO_SWIPE_SEL)) { swipe = null; return; }
-    swipe = { x: t.clientX, y: t.clientY, at: Date.now(), multi: false };
+    if (t.clientX < EDGE_GUARD || t.clientX > width - EDGE_GUARD) { drag = null; return; }
+    if (e.target && e.target.closest && e.target.closest(NO_SWIPE_SEL)) { drag = null; return; }
+    if (gestureBlocked()) { drag = null; return; }
+    drag = {
+      x: t.clientX, y: t.clientY, at: Date.now(),
+      lastX: t.clientX, lastAt: Date.now(), velocity: 0,
+      axis: 'undecided', offset: 0,
+    };
   }, { passive: true });
 
   document.addEventListener('touchmove', function (e) {
-    if (swipe && e.touches.length > 1) swipe.multi = true;
+    if (!drag) return;
+    if (e.touches.length > 1) { // a second finger means zoom, not a swipe
+      if (drag.axis === 'horizontal') springBack();
+      drag = null;
+      return;
+    }
+
+    var t = e.touches[0];
+    var dx = t.clientX - drag.x;
+    var dy = t.clientY - drag.y;
+
+    if (drag.axis === 'undecided') {
+      if (Math.abs(dy) > LOCK_SLOP && Math.abs(dy) > Math.abs(dx)) {
+        drag = null; // vertical: hand the gesture back to the browser for good
+        return;
+      }
+      if (Math.abs(dx) > LOCK_SLOP && Math.abs(dx) > Math.abs(dy)) {
+        drag.axis = 'horizontal';
+        var el = app();
+        if (el) { el.style.transition = 'none'; el.style.willChange = 'transform'; }
+      } else {
+        return; // not enough travel to call it yet
+      }
+    }
+
+    // Rolling velocity from the most recent movement, for the flick test.
+    var now = Date.now();
+    var dt = now - drag.lastAt;
+    if (dt > 0) drag.velocity = (t.clientX - drag.lastX) / dt;
+    drag.lastX = t.clientX;
+    drag.lastAt = now;
+
+    // Resist past the first and last tab so the end of the list is felt.
+    var index = currentTabIndex();
+    var atStart = index === 0 && dx > 0;
+    var atEnd = index === TABS.length - 1 && dx < 0;
+    drag.offset = (atStart || atEnd) ? dx * END_RESISTANCE : dx;
+    setOffset(drag.offset);
   }, { passive: true });
 
-  document.addEventListener('touchcancel', function () { swipe = null; }, { passive: true });
+  function abortDrag() {
+    if (drag && drag.axis === 'horizontal') springBack();
+    drag = null;
+  }
 
-  document.addEventListener('touchend', function (e) {
-    var start = swipe;
-    swipe = null;
-    if (!start || start.multi) return;
-    if (Date.now() - start.at > MAX_DURATION) return;
+  document.addEventListener('touchcancel', abortDrag, { passive: true });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) abortDrag();
+  });
 
-    var t = e.changedTouches && e.changedTouches[0];
-    if (!t) return;
-    var dx = t.clientX - start.x;
-    var dy = t.clientY - start.y;
-    // Mostly-horizontal only, so scrolling a long list never navigates.
-    if (Math.abs(dx) < MIN_DISTANCE || Math.abs(dx) <= Math.abs(dy) * 2) return;
-    if (swipeBlocked()) return;
+  document.addEventListener('touchend', function () {
+    var d = drag;
+    drag = null;
+    if (!d || d.axis !== 'horizontal') return;
 
     var index = currentTabIndex();
-    if (index === -1) return; // settings.html is not in the swipe order
+    if (index === -1) { springBack(); return; }
+
+    var width = window.innerWidth || document.documentElement.clientWidth;
+    var travelled = Math.abs(d.offset) / width;
+    var speed = Math.abs(d.velocity);
+    var forward = d.offset < 0;
+    var target = forward ? index + 1 : index - 1;
 
     // No wrap-around: the ends are dead stops, like a native tab bar.
-    if (dx < 0 && index < TABS.length - 1) navigateTo(index + 1, 'forward');
-    else if (dx > 0 && index > 0) navigateTo(index - 1, 'back');
+    if (target < 0 || target >= TABS.length) { springBack(); return; }
+
+    var farEnough = travelled > COMMIT_FRACTION;
+    var thrown = speed > FLICK_VELOCITY && travelled > FLICK_FRACTION &&
+                 (forward ? d.velocity < 0 : d.velocity > 0);
+
+    if (farEnough || thrown) commit(target, forward ? 'forward' : 'back', speed);
+    else springBack();
   }, { passive: true });
 
   /* ------------------------------------------------------------- dropdown */

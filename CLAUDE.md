@@ -155,12 +155,20 @@ you spend time: **Lock In, Settings, account/logout**.
   shows the bar with **nothing active** and is not in the swipe order.
   `lock-in.html` loads neither the shared CSS nor JS, so the focus screen
   stays bare by construction — keep it that way.
-- **Swipe left/right moves one tab**, no wrap-around at the ends. It is
-  ignored when the gesture starts in the 24px screen-edge zone (that's the
-  OS back-swipe), on an `input`/`textarea`/`select`/`[contenteditable]`/
-  `[data-no-swipe]`, when a second finger lands, when it's slower than 600ms,
-  shorter than 60px, or more vertical than horizontal. **Put
-  `data-no-swipe` on any new horizontally-draggable control.**
+- **The swipe is a drag, not a flick-and-guess.** `#app` tracks the finger 1:1,
+  resists at `0.3x` past the first and last tab, and on release either springs
+  back or flings the rest of the way and navigates (commit at 30% of the
+  viewport width, or a flick over 0.5 px/ms past 15%).
+  **`touch-action: pan-y` on `#app` is load-bearing**: it hands vertical
+  scrolling to the browser and horizontal movement to us, which is why no
+  listener ever calls `preventDefault()` and all of them stay passive. The
+  first ~10px locks the axis; once vertical, the gesture is the browser's for
+  good. `html, body { overflow-x: hidden }` stops a page dragged off-screen
+  growing a scrollbar.
+- Still ignored at touchstart: the 24px screen-edge zone (the OS back-swipe),
+  `input`/`textarea`/`select`/`[contenteditable]`/`[data-no-swipe]`, and a
+  second finger. **Put `data-no-swipe` on any new horizontally-draggable
+  control.**
 - **Page-to-page animation is the browser's cross-document View Transitions**
   (`@view-transition { navigation: auto; }` in `rotulus.css`), not JS —
   nothing calls `startViewTransition()`. Below iOS 18.2 / Chrome 126 the app
@@ -170,6 +178,11 @@ you spend time: **Lock In, Settings, account/logout**.
   `rotulus_vt_dir` key that the swipe sets. Tapping a tab deliberately leaves
   it unset, which gives a cross-fade. Copy that whole two-statement head
   snippet exactly when adding a page.
+- **The outgoing page must not be animated.** The drag already carried `#app`
+  off-screen before the navigation, so the outgoing snapshot is nothing but the
+  shared blob background: `::view-transition-old(root)` is set to
+  `animation: none` and only the incoming page moves. Animating both is what
+  made the two pages look like they were sliding over each other.
 - `netlify.toml` serves HTML as `no-cache` (revalidate) rather than
   `no-store`, so a swipe gets a `304` instead of re-downloading the page, and
   the two neighbouring tabs can be `rel="prefetch"`ed. It still revalidates
@@ -184,6 +197,44 @@ you spend time: **Lock In, Settings, account/logout**.
   device the pull replaces everything underneath. The "locked in for X
   minutes" pill asks before entering Lock In, since Lock In is full-screen
   and starts counting immediately.
+
+## Wide layouts (phone landscape and desktop)
+
+Phone portrait is the default and is what the rest of this file describes. Two
+wide layouts sit on top of it, sharing one idea: **the bottom tab bar becomes a
+left rail.** That reclaims the 58px the bar was eating and puts the wasted
+horizontal space to work. Before this existed, 812×375 gave 317px of usable
+height and three full screens of scrolling on the dashboard; it's now ~1.1.
+
+- Breakpoints are **deliberately disjoint** so they can never both match:
+  desktop is `(min-width: 900px)`, phone landscape is
+  `(orientation: landscape) and (max-height: 560px) and (max-width: 899px)`.
+  A tablet in portrait falls through to the phone layout on purpose.
+- **The rail is the same `.tabbar` element, only restyled** — `buildTabBar()`
+  already emits the markup it needs, so there is no JS branch for any of this.
+  Desktop shows labels at 200px; phone landscape is icon-only at 64px, with the
+  labels moved off-screen rather than `display: none` so the six links keep
+  their accessible names.
+- **`#app` becomes a two-column grid, and everything opts out by default**
+  (`:where(#app) > * { grid-column: 1 / -1 }`). A page names the cards it wants
+  side by side. Written as `#app > *` that default would carry ID specificity
+  and **silently beat every per-page placement rule** — which it did, until the
+  layouts were measured rather than eyeballed. `:where()` zeroes it.
+- Where two panels must sit side by side, they are **adjacent siblings** with
+  `grid-column: 1` and `2` — grid auto-placement then puts them on one row with
+  no explicit row numbers to go stale. `.pomo-side`, `.dash-main` and
+  `.dash-chart` are wrappers that exist purely to make that true; the
+  alternative, spanning explicit rows, breaks the moment the auth card hides on
+  login or the pie chart is toggled.
+- Card lists that just want more columns get one shared rule in `rotulus.css`:
+  `.slots`, `#categoriesList`, `#goalsList`. Note it is **`.slots`, not
+  `#tracker`** — the slot cards are nested one level down.
+- The compact landscape layout also floats `.nav-row` out of the flow and hides
+  the eyebrow and subtitle. On a 375px-tall screen the chrome was spending
+  153px before any content appeared.
+- Pomodoro's timer ring needs no work here: `initTimerRing()` already watches
+  `#timerCard` with a `ResizeObserver`, so it rebuilds across a breakpoint
+  change or a device rotation on its own (verified, 1286 → 1592).
 
 ## Image assets (`assets/` folder)
 

@@ -105,6 +105,9 @@ html, body {
   background: var(--bg);
   min-height: 100vh;
   min-height: 100dvh;
+  /* The swipe drags #app right off the side of the screen. Without this the
+     browser would grow a horizontal scrollbar to chase it. */
+  overflow-x: hidden;
 }
 
 body {
@@ -152,6 +155,10 @@ body::before {
   /* Bottom padding clears the fixed .tabbar (56px tall) plus the iPhone home
      indicator, so the last card on a page is never trapped behind the bar. */
   padding: 8px 22px calc(76px + env(safe-area-inset-bottom));
+  /* pan-y tells the browser vertical scrolling is still its job while
+     horizontal movement belongs to the swipe. That split is what lets the drag
+     handler stay passive — it never has to call preventDefault(). */
+  touch-action: pan-y;
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
@@ -213,22 +220,22 @@ a { touch-action: manipulation; }
 @view-transition { navigation: auto; }
 
 @keyframes vt-slide-from-right { from { transform: translateX(100%); } }
-@keyframes vt-slide-to-left    { to   { transform: translateX(-30%); opacity: 0.4; } }
 @keyframes vt-slide-from-left  { from { transform: translateX(-100%); } }
-@keyframes vt-slide-to-right   { to   { transform: translateX(30%); opacity: 0.4; } }
+
+/* The drag already carried #app off the side before we navigated, so the
+   outgoing snapshot is nothing but the shared blob background. Hold it still
+   and let the incoming page slide in over it. Animating both is what used to
+   make the two pages look like they were sliding over each other. */
+html[data-vt-dir]::view-transition-old(root) {
+  animation: none;
+}
 
 /* Swiped left (moving one tab further along the bar). */
-html[data-vt-dir="forward"]::view-transition-old(root) {
-  animation: vt-slide-to-left var(--t-med) var(--ease) both;
-}
 html[data-vt-dir="forward"]::view-transition-new(root) {
   animation: vt-slide-from-right var(--t-med) var(--ease) both;
 }
 
 /* Swiped right (moving back towards Home). */
-html[data-vt-dir="back"]::view-transition-old(root) {
-  animation: vt-slide-to-right var(--t-med) var(--ease) both;
-}
 html[data-vt-dir="back"]::view-transition-new(root) {
   animation: vt-slide-from-left var(--t-med) var(--ease) both;
 }
@@ -648,3 +655,138 @@ html[data-vt-dir]::view-transition-new(root) {
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 .flash-highlight { animation: rotulus-flash 1.2s var(--ease) 1; }
+
+/* ==========================================================================
+   Wide layouts: phone landscape and desktop
+   --------------------------------------------------------------------------
+   Phone portrait is the default above and is left alone. The two wide layouts
+   share one idea — the bottom tab bar becomes a left rail, which reclaims the
+   58px of vertical space the bar was eating and puts the wasted horizontal
+   space to work. The queries are deliberately disjoint (the compact one is
+   capped at 899px) so they can never both match and fight.
+
+   Measured before this existed, at 812x375: 317px of usable height, three
+   full screens of scrolling on the dashboard, and 332px of dead space either
+   side of a 480px column.
+   ========================================================================== */
+
+@media (min-width: 900px),
+       (orientation: landscape) and (max-height: 560px) and (max-width: 899px) {
+
+  /* Padding on <body> rather than #app so the content still centres itself —
+     in the space left over beside the rail, not the whole viewport. */
+  body {
+    padding-left: var(--rail-w);
+    padding-top: max(20px, env(safe-area-inset-top));
+  }
+
+  /* Same element the phone uses, same markup from buildTabBar() — only the
+     styling changes, so there is no JS branch anywhere for this. */
+  .tabbar {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--rail-w);
+    max-width: none;
+    transform: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 16px 8px calc(16px + env(safe-area-inset-bottom));
+    border-top: none;
+    border-right: 1px solid var(--line);
+  }
+
+  .tab {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  #app {
+    max-width: var(--content-max);
+    padding: 0 24px 40px;
+    /* Containing block for the gear, which the compact layout floats out of
+       the flow to win back a whole row. */
+    position: relative;
+    /* Two columns, but everything opts out by default: a page has to name the
+       cards it wants side by side. Safer than the reverse, where any element a
+       page forgot would silently drop into a half-width column. */
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 18px;
+    align-items: start;
+  }
+  /* :where() zeroes the specificity, so this really is a default — a page can
+     override it with a plain class. Written as #app > * it would carry ID
+     specificity and silently beat every per-page placement rule. */
+  :where(#app) > * { grid-column: 1 / -1; }
+
+  /* Card lists that just want more columns when there is room. These three IDs
+     live on three different pages, but they express one shared idea, so the
+     rule lives here rather than being copied into each page. align-items:start
+     stops a tall card stretching its neighbour to match. */
+  .slots,
+  #categoriesList,
+  #goalsList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    column-gap: 14px;
+    align-items: start;
+  }
+}
+
+/* --- Desktop: rail wide enough to carry labels --------------------------- */
+@media (min-width: 900px) {
+  :root {
+    --rail-w: 200px;
+    --content-max: 1040px;
+  }
+
+  .tab {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+  }
+  .tab-icon { width: 20px; height: 20px; }
+  .tab-label { font-size: 11px; }
+}
+
+/* --- Phone landscape: icon-only rail, as narrow as it can usefully be ----- */
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 899px) {
+  :root {
+    --rail-w: 64px;
+    --content-max: 900px;
+  }
+
+  .tab { padding: 9px 2px; }
+  .tab-icon { width: 21px; height: 21px; }
+
+  /* Hidden from the eye, kept for screen readers — an icon-only rail with no
+     accessible name would be six unlabelled links. */
+  .tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Vertical room is the scarce thing here. The chrome was spending 153px of a
+     375px screen on a title, a decorative subtitle and a whole row holding one
+     gear button — before any content. Float the gear over the header and trim
+     the type back; the page name is still there, just not shouted. */
+  .nav-row {
+    position: absolute;
+    top: 0;
+    right: 24px;
+    margin: 0;
+    z-index: 15;
+  }
+  .header { margin-bottom: 10px; }
+  .header-art { display: none; }
+  .title { font-size: 24px; }
+  .eyebrow, .subtitle { display: none; }
+  #app { padding-bottom: 20px; }
+}
