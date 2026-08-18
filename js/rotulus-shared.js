@@ -334,5 +334,14 @@
     buildTabBar();
   });
 
+  /* Registered from here so every page installs it, though only the pomodoro
+     page uses it — for the completion banner. See sw.js: no push, no fetch
+     handler, no caching. */
+  function registerServiceWorker() {
+    if (!navigator.serviceWorker) return;
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  }
+
   window.addEventListener('load', prefetchNeighbours);
+  window.addEventListener('load', registerServiceWorker);
 })();

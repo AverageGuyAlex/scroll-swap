@@ -19,10 +19,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=4">
+<link rel="stylesheet" href="/css/rotulus.css?v=5">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=4"></script>
+<script defer src="/js/rotulus-shared.js?v=5"></script>
 
 <style>
   /* Page-specific: settings */
@@ -101,6 +101,21 @@
     </label>
     <select id="resetHourSelect" class="inline-input" style="width:100%; padding:10px 12px; font-size:13.5px;"></select>
     <p class="gear-note" style="margin-top:10px;">Your daily slots and streak will reset at this time each day instead of midnight.</p>
+  </div>
+
+  <div class="section-card">
+    <p class="section-title">Pomodoro alarm</p>
+
+    <label class="setting-label">Sound when a session ends</label>
+    <div class="seg-row">
+      <button class="seg-btn" data-alarm="on">On</button>
+      <button class="seg-btn" data-alarm="off">Off</button>
+    </div>
+    <p class="gear-note">Plays a chime when a focus session or a break finishes.</p>
+
+    <label class="setting-label" style="margin-top:16px;">Lock screen notification</label>
+    <button class="auth-btn secondary" id="notifyBtn" style="width:100%;">Enable notifications</button>
+    <p class="gear-note" id="notifyNote" style="margin-top:10px;"></p>
   </div>
 </div>
 
@@ -192,8 +207,75 @@
   // ---- Init ----
   // Theme + nav dropdown behavior now lives in /js/rotulus-shared.js.
 
+  // ---- Pomodoro alarm ----
+
+  const ALARM_ENABLED_KEY = 'scrollswap_pomodoro_alarm';
+
+  function renderAlarmToggle() {
+    let on = true;
+    try { on = localStorage.getItem(ALARM_ENABLED_KEY) !== 'off'; } catch (e) {}
+    document.querySelectorAll('.seg-btn[data-alarm]').forEach(function (b) {
+      b.classList.toggle('selected', b.dataset.alarm === (on ? 'on' : 'off'));
+    });
+  }
+
+  function initAlarmToggle() {
+    document.querySelectorAll('.seg-btn[data-alarm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        try { localStorage.setItem(ALARM_ENABLED_KEY, b.dataset.alarm); } catch (e) {}
+        renderAlarmToggle();
+      });
+    });
+    renderAlarmToggle();
+  }
+
+  /* iOS only grants notification permission from a user gesture, and only in a
+     PWA added to the Home Screen. Asking from a button here rather than on the
+     first Start keeps the permission sheet away from the moment the app is
+     supposed to feel frictionless. */
+  function renderNotifyState() {
+    const btn = document.getElementById('notifyBtn');
+    const note = document.getElementById('notifyNote');
+    if (!btn || !note) return;
+
+    if (typeof Notification === 'undefined') {
+      btn.disabled = true;
+      btn.textContent = 'Not supported';
+      note.textContent = 'This browser cannot show notifications. Add Rotulus to your Home Screen and open it from there.';
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      btn.disabled = true;
+      btn.textContent = 'Notifications on';
+      note.textContent = 'You will get a banner when a session finishes.';
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      btn.disabled = true;
+      btn.textContent = 'Notifications blocked';
+      note.textContent = 'Blocked for this app. Turn them back on in iOS Settings \u2192 Notifications \u2192 Rotulus.';
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Enable notifications';
+    note.textContent = 'Only works when Rotulus is opened from your Home Screen icon.';
+  }
+
+  function initNotifyButton() {
+    const btn = document.getElementById('notifyBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+      if (typeof Notification === 'undefined') return;
+      try { await Notification.requestPermission(); } catch (e) {}
+      renderNotifyState();
+    });
+    renderNotifyState();
+  }
+
   function initApp() {
     initResetHour();
+    initAlarmToggle();
+    initNotifyButton();
   }
 
   function initIdentity() {

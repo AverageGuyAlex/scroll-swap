@@ -506,7 +506,11 @@ html[data-vt-dir]::view-transition-new(root) {
    Theme toggle (settings page + gear dropdowns)
    ========================================================================== */
 
-.theme-toggle-row {
+/* .seg-row / .seg-btn share the look but NOT the class: applyTheme() strips
+   .selected from every .theme-btn whose dataset.theme does not match the
+   current choice, which would silently clear an unrelated toggle. */
+.theme-toggle-row,
+.seg-row {
   display: flex;
   gap: 8px;
   margin-bottom: 14px;
@@ -514,7 +518,8 @@ html[data-vt-dir]::view-transition-new(root) {
   border-bottom: 1px solid var(--line);
 }
 
-.theme-btn {
+.theme-btn,
+.seg-btn {
   flex: 1;
   font-family: var(--font-body);
   font-weight: 800;
@@ -528,7 +533,8 @@ html[data-vt-dir]::view-transition-new(root) {
   padding: 9px 6px;
   cursor: pointer;
 }
-.theme-btn.selected {
+.theme-btn.selected,
+.seg-btn.selected {
   background: var(--primary);
   color: var(--on-primary);
   border-color: var(--primary);

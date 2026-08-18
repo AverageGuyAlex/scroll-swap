@@ -19,10 +19,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=4">
+<link rel="stylesheet" href="/css/rotulus.css?v=5">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=4"></script>
+<script defer src="/js/rotulus-shared.js?v=5"></script>
 
 <style>
   /* Page-specific: pomodoro */
@@ -732,6 +732,127 @@
       clearInterval(timerDisplayHandle);
       timerDisplayHandle = null;
     }
+    stopKeepAlive();
+  }
+
+  /* ---- Completion alarm -------------------------------------------------
+     Three independent channels so one failing never silences the others: a
+     chime here, a lock-screen banner, and a flash on the timer card.
+     Every browser API is reached through window/typeof — the test harnesses
+     run this file with no Audio and no Notification, and a bare reference
+     would throw ReferenceError. */
+  const ALARM_ENABLED_KEY = 'scrollswap_pomodoro_alarm';
+  const CHIME_SRC = '/assets/alarm-chime.wav';
+  const CHIME_REPEATS = 3;
+  const CHIME_GAP_MS = 2000;
+
+  let chimeAudio = null;
+  let chimeTimers = [];
+
+  function alarmEnabled() {
+    try { return localStorage.getItem(ALARM_ENABLED_KEY) !== 'off'; }
+    catch (e) { return true; }
+  }
+
+  function stopChime() {
+    chimeTimers.forEach(clearTimeout);
+    chimeTimers = [];
+    if (chimeAudio) { try { chimeAudio.pause(); } catch (e) {} }
+  }
+
+  /* Repeats a few times so it is not missed from across a desk, and gives up
+     the moment you touch anything — at that point you have clearly noticed. */
+  function playChime() {
+    if (!alarmEnabled() || !window.Audio) return;
+    stopChime();
+    try {
+      chimeAudio = new window.Audio(CHIME_SRC);
+      const ring = () => {
+        try {
+          chimeAudio.currentTime = 0;
+          const p = chimeAudio.play();
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) {}
+      };
+      ring();
+      for (let i = 1; i < CHIME_REPEATS; i++) {
+        chimeTimers.push(setTimeout(ring, i * CHIME_GAP_MS));
+      }
+    } catch (e) {}
+  }
+
+  function flashTimerCard() {
+    const card = document.getElementById('timerCard');
+    if (!card || !card.classList) return;
+    card.classList.remove('flash-highlight');
+    void card.offsetWidth; // restart the animation if it is already running
+    card.classList.add('flash-highlight');
+  }
+
+  document.addEventListener('pointerdown', stopChime, { passive: true });
+
+  /* iOS has no Notification constructor — a banner can only come from a
+     service worker registration. Silent failure everywhere is correct here:
+     no permission, no worker, or an older browser all just mean the chime and
+     the flash carry the load on their own. */
+  async function showCompletionBanner(wasBreak, minutes) {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission !== 'granted') return;
+    if (!navigator.serviceWorker) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(
+        wasBreak ? 'Break over' : 'Focus session done',
+        {
+          body: wasBreak ? 'Back to it.' : minutes + ' minutes logged.',
+          tag: 'rotulus-pomodoro', // replaces the previous one rather than stacking
+          icon: '/assets/app-icon.png',
+        }
+      );
+    } catch (e) {}
+  }
+
+  /* ---- Keep-alive -------------------------------------------------------
+     Media playback is what stops iOS suspending a backgrounded page, which is
+     what keeps tick() firing so the alarm lands at zero rather than whenever
+     you next open the app. The track is near-inaudible noise rather than
+     digital silence, which iOS optimises away.
+
+     This is an empirical trick, not a guaranteed API. If iOS suspends the page
+     anyway the alarm fires on reopen instead — the same behaviour as before
+     this feature existed, so the worst case is no regression. */
+  const KEEPALIVE_SRC = '/assets/alarm-keepalive.wav';
+  let keepAliveAudio = null;
+
+  function startKeepAlive() {
+    if (keepAliveAudio || !window.Audio) return;
+    try {
+      keepAliveAudio = new window.Audio(KEEPALIVE_SRC);
+      keepAliveAudio.loop = true;
+      keepAliveAudio.volume = 0.02;
+      const p = keepAliveAudio.play();
+      if (p && p.catch) p.catch(armKeepAliveRetry);
+    } catch (e) { keepAliveAudio = null; }
+  }
+
+  /* Autoplay is refused when the ticker starts on page load rather than from a
+     tap — reloading mid-session, say. Arm a one-shot retry so the next touch
+     anywhere gets it going. */
+  function armKeepAliveRetry() {
+    document.addEventListener('pointerdown', function retry() {
+      if (keepAliveAudio) {
+        try {
+          const p = keepAliveAudio.play();
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) {}
+      }
+    }, { once: true, passive: true });
+  }
+
+  function stopKeepAlive() {
+    if (!keepAliveAudio) return;
+    try { keepAliveAudio.pause(); } catch (e) {}
+    keepAliveAudio = null;
   }
 
   function tick() {
@@ -745,8 +866,13 @@
     }
   }
 
+  /* The keep-alive hangs off the ticker rather than the individual buttons.
+     These two functions already mean "a timer is counting" and are called from
+     all seven places that start or stop one, so the audio cannot drift out of
+     step the way seven hand-placed calls would. */
   function startDisplayTicker() {
     stopDisplayTicker();
+    startKeepAlive();
     timerDisplayHandle = setInterval(tick, 1000);
   }
 
@@ -754,6 +880,9 @@
     stopDisplayTicker();
     const wasBreak = ts.mode === 'break';
     const minutesElapsed = Math.round(ts.durationSeconds / 60);
+    playChime();
+    flashTimerCard();
+    showCompletionBanner(wasBreak, minutesElapsed);
     // Either way we land on a fresh focus session, ready to go again.
     const freshState = freshFocusState(ts);
     saveTimerState(freshState);
@@ -911,6 +1040,11 @@
         document.getElementById('resetBtn').disabled = true;
         document.getElementById('breakBtn').disabled = true;
         pendingCompletion = ts;
+        // Chime and flash, but deliberately no banner: this finished while you
+        // were away and you are already looking at the screen. A notification
+        // about it would be pure noise.
+        playChime();
+        flashTimerCard();
       } else {
         renderTimerDisplay(remaining);
         setControlsState(ts);

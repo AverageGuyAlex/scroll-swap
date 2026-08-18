@@ -97,6 +97,49 @@ therefore live under `scrollswap_` — that's why the keys are
 `pomodoro_break_minutes` would sync as a bogus day entry and corrupt the totals
 and the pie chart.
 
+## Pomodoro completion alarm
+
+Three independent channels fire when a session ends, so one failing never
+silences the others: a chime (`assets/alarm-chime.wav`), a lock-screen banner,
+and a `.flash-highlight` pulse on the timer card.
+
+- **Two completion paths, and they differ.** `completeTimer()` is the live one
+  and fires all three. `displayTimerFromLocal()` handles a session that ended
+  while the app was closed — it chimes and flashes but deliberately shows **no
+  banner**, because you are already looking at the screen by then.
+- **The keep-alive is why the alarm lands on time.** `assets/alarm-keepalive.wav`
+  is a looping, near-inaudible track — not digital silence, which iOS optimises
+  away. Media playback is what stops iOS suspending a backgrounded page, so
+  `tick()` keeps running with the screen off. It hangs off
+  `startDisplayTicker()`/`stopDisplayTicker()` rather than the individual
+  buttons, because those two already mean "a timer is counting" and cover all
+  seven call sites without being able to drift.
+  **This is an empirical trick, not a guaranteed API.** If iOS suspends the
+  page anyway, the alarm fires on reopen — the pre-feature behaviour, so the
+  worst case is no regression.
+- **A keep-alive left playing is a permanent battery drain.** `tests/alarm-test.js`
+  guards the stop path by firing the Reset and Pause handlers directly. It
+  cannot be checked in a browser: `new Audio()` returns a **detached** element,
+  so `document.querySelectorAll('audio')` never finds it.
+- **`sw.js` exists only because iOS has no `Notification` constructor** — a
+  banner must come from `ServiceWorkerRegistration.showNotification()`. There
+  is no push and **no `fetch` handler**, so it cannot cache and cannot serve
+  stale content. Never add one: a caching service worker survives a redeploy
+  and no `?v=` bump would rescue it. Removing it from devices that already have
+  it requires shipping a version that calls `self.registration.unregister()` —
+  deleting the file is not enough.
+- **The alarm setting key is `scrollswap_pomodoro_alarm`** (`'on'`/`'off'`,
+  default on). The prefix is mandatory — see the key-prefix trap above.
+  `Notification.permission` is the only source of truth for whether a banner can
+  show; there is deliberately no second flag that could disagree with it.
+- **The alarm toggle uses `.seg-btn`, not `.theme-btn`.** `applyTheme()` clears
+  `selected` from every `.theme-btn` whose `dataset.theme` does not match the
+  current choice, which would silently wipe the alarm setting's highlight on any
+  theme change.
+- Regenerate the sounds with `node tools/make-alarm-audio.js`. Because
+  `/assets/*` is cached for a year, a changed sound needs a **new filename**,
+  not an overwrite.
+
 ## Design system (added in the Rotulus redesign)
 
 - **`css/rotulus.css`** — all shared tokens (colors, radii, shadows, motion,
