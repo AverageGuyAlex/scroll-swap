@@ -15,16 +15,27 @@
   [headers.values]
     Cache-Control = "no-cache"
 
+# CSS and JS are cache-busted by the ?v=N in every page's <link>/<script>, so
+# they can be cached forever — exactly like /assets/*. They used to be
+# "no-store", which forbids the browser from keeping ANY copy, so every tab
+# switch re-downloaded them before the page could paint. With the slide
+# animation that wait became a visible pause on a blank background.
+#
+# The ?v=N bump is what invalidates them for browsers (Netlify clears its own
+# edge cache on each deploy). tests/cache-version-check.js fails the build if
+# either file changes without the bump — never remove that guard while these
+# headers say immutable.
 [[headers]]
   for = "/css/*"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
   for = "/js/*"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
 
+# Not versioned and registered by URL, so it must stay revalidated.
 [[headers]]
   for = "/sw.js"
   [headers.values]

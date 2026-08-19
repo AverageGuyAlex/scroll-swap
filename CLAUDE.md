@@ -66,9 +66,48 @@ Downloads are deliberately non-destructive: they only add keys or replace
 state when the server actually returned something. Keep it that way.
 
 Regression test: `tests/sync-test.js` runs each page's real script against a
-fake DOM and asserts how many uploads each scenario produces. Run it with
-`node tests/sync-test.js` (needs nothing installed). `tests/syntax-check.js`
-parses every inline `<script>` — worth running after any hand edit to the HTML.
+fake DOM and asserts how many uploads each scenario produces — it is the guard
+against reintroducing the 2026-08-04 wipe. `tests/syntax-check.js` parses every
+inline `<script>`, and `tests/functions-test.js` covers the serverless half (see
+the next section). Nothing needs installing for any of them:
+
+```bash
+node tests/functions-test.js && node tests/sync-test.js && node tests/cache-version-check.js && node tests/syntax-check.js && node tests/alarm-test.js
+```
+
+## The sync functions (`netlify/functions/`)
+
+All six (`todos`, `goals`, `habits`, `pomodoro`, `diary`, `lockin`) are the same
+file with two things swapped: the Blobs store name and the empty-state default a
+`GET` returns. Change one and you almost certainly need to change all six —
+`tests/functions-test.js` runs every one of them, so it will tell you.
+
+- **They are legacy V1 functions** (`exports.handler = async (event, context)`,
+  reading `context.clientContext.user`). That matters: V2 functions get Netlify
+  Blobs configured automatically, **V1 ones do not**. So `BLOBS_SITE_ID` and
+  `BLOBS_TOKEN` (set in the Netlify UI, not in `netlify.toml`) are required, not
+  optional.
+- **`BLOBS_TOKEN` is a personal access token, and those expire or get revoked.**
+  When that happens all six functions fail at once, on every device, with no code
+  change on your side — the app shows "Sync failed" everywhere and nothing in the
+  repo explains why. That is the first thing to check when sync breaks.
+- **The 401 check must stay first**, before the env-var check and before any store
+  access. It is the only thing standing between a stranger and the data, and its
+  body deliberately says nothing about configuration — an unauthenticated caller
+  must not learn whether the site's credentials are set. Tested.
+- **`getStore()` belongs inside the `try`.** It used to sit above it, so a
+  rejected credential crashed the whole function before the `catch` could report
+  anything, and the client saw a bare failure with no cause. The `catch` now
+  returns `err.name` too — the SDK throws `MissingBlobsEnvironmentError` by name,
+  which is the half that actually identifies the problem.
+- **Diagnosing a sync failure from the browser:** the status code names the layer.
+  `401` = Identity isn't populating `clientContext`; `500` with a `missing` array
+  = env vars absent; `500` with a `name` = credentials rejected; a bare platform
+  `502` = something threw outside the handler entirely.
+- **`package-lock.json` pins `@netlify/blobs` to 8.2.0.** Before it existed,
+  `^8.1.0` re-resolved on every deploy. Keep the lockfile committed. The package
+  is on 11.x now, so an upgrade is a real (and separate) piece of work — the V1
+  functions and the manual siteID/token setup are what make it non-trivial.
 
 ## Pomodoro timer state
 
@@ -154,8 +193,17 @@ and a `.flash-highlight` pulse on the timer card.
   `window.rotulus.applyTheme(theme)` and `window.rotulus.getTheme()`.
   Don't re-duplicate this logic per-page.
 - **Bump `?v=` on `rotulus.css`/`rotulus-shared.js` links whenever you edit
-  them** — `netlify.toml` sets `no-cache` on `/css/*` and `/js/*` (this app
-  was bitten before by stale-CSS bugs from aggressive browser caching).
+  them, in all seven pages that load them.** `netlify.toml` now serves
+  `/css/*` and `/js/*` as `max-age=31536000, immutable`, so the `?v=` number
+  is the *only* thing that gets anyone onto a new copy — miss the bump and
+  they keep the old one for a year. They used to be `no-store`, which forbids
+  the browser from keeping any copy at all: every tab switch re-downloaded
+  both files before the page could paint, which the slide animation turned
+  into a visible pause. `tests/cache-version-check.js` fails if either file
+  changes without the bump, and records what shipped in
+  `tests/asset-versions.json` — commit that file with the change. Re-record
+  by hand with `node tests/cache-version-check.js --update` (only correct
+  while the current version has not been deployed yet).
 - **Theme:** `:root` = light tokens (default), `:root.theme-dark` = dark
   overrides. Saved as `localStorage['scrollswap_theme']` = `'light'` /
   `'dark'`, or absent for **Auto** (follows `prefers-color-scheme`). Every
@@ -229,8 +277,15 @@ you spend time: **Lock In, Settings, account/logout**.
 - `netlify.toml` serves HTML as `no-cache` (revalidate) rather than
   `no-store`, so a swipe gets a `304` instead of re-downloading the page, and
   the two neighbouring tabs can be `rel="prefetch"`ed. It still revalidates
-  every load, so a page can never go stale. `/css/*` and `/js/*` stay
-  `no-store` — bump `?v=` there instead.
+  every load, so a page can never go stale. `/css/*` and `/js/*` are cached
+  hard and busted by `?v=` — see the Design System section.
+- **The frozen gap is the thing to protect.** During a cross-document view
+  transition the browser holds the *outgoing* page as a still bitmap until
+  the incoming document is ready to paint, which means every render-blocking
+  resource in its `<head>` extends the pause — and nothing can animate during
+  it, so a spinner there would sit motionless. Shortening the critical path
+  is the only lever. Don't add render-blocking resources to `<head>`, and
+  don't put `/css/*` or `/js/*` back on a header that forces a re-fetch.
 - **Dashboard stat cards are links** into the page their number came from.
   Two carry a hash the target page acts on: `todo.html#archive` opens the
   completed-tasks archive through the real toggle button (so `archiveOpen`
@@ -289,6 +344,41 @@ filenames (backgrounds, header illustration, future per-slot icons). Only
 `netlify.toml` caches `/assets/*` for 1 year — **if replacing an existing
 image, give it a new filename** rather than overwriting, or the CDN cache
 will keep serving the old one.
+
+## First paint: every page renders from localStorage
+
+Storage is local-first, and that has to include the *render*. Every data page
+paints from `localStorage` in its `initApp()` on `DOMContentLoaded` — before
+Netlify Identity initialises and before any server pull — then re-renders when
+the pull lands. `todo.html` was the exception until 2026-08-19: it printed
+"Loading your tasks…" and waited on `netlifyIdentity.init()` plus a
+`pullFromServer()` round trip to show tasks that were already on the device.
+Don't reintroduce that pattern on a new page.
+
+- **`initApp()` must not be able to throw.** In `todo.html` the local render is
+  wrapped in `try`/`catch`, because it now runs *before* `initIdentity()` in the
+  same `DOMContentLoaded` handler. An exception on oddly-shaped stored data (a
+  category with no `subcategories` array, say) would otherwise stop Identity
+  initialising and cost the user login and sync entirely — not just the head
+  start it was meant to gain.
+- **Loading placeholders are deliberately rare** — `.skeleton-card` and
+  `.is-syncing` in `rotulus.css`. Where a page already has local data a skeleton
+  flashes for a single frame and reads as a flicker, so they are used in exactly
+  two places: `todo.html` on a first-ever load, where there is genuinely nothing
+  local yet and "No categories yet" would be a lie until the pull answers
+  (`firstSyncPending`, with a 6s timeout so a widget that never fires `init`
+  cannot strand the skeleton); and `dashboard.html` while it refreshes numbers
+  it is already showing.
+- Skeletons are built from `var(--card)` plus the real card border and shadow,
+  **not** `var(--line)` as a fill. As a fill that token rendered `#E5E1F4` on the
+  `#EDEBF7` light background — about 8/255 per channel, which is invisible.
+- Both pulse animations **end on their resting state** (`opacity: 1`). The
+  reduced-motion rule collapses every animation to `0.01ms` with one iteration,
+  which snaps to the final keyframe, so they degrade to a calm solid block
+  rather than freezing mid-pulse.
+- Side effect worth knowing: `todo.html` no longer needs Identity to render, so
+  it now works on `localhost`, where Netlify Identity can never initialise. Seed
+  `scrollswap_todo_state` and it renders.
 
 ## Habit tracker (`index.html`) specifics
 

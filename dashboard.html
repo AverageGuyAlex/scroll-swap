@@ -19,10 +19,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=5">
+<link rel="stylesheet" href="/css/rotulus.css?v=6">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=5"></script>
+<script defer src="/js/rotulus-shared.js?v=6"></script>
 
 <style>
   /* Page-specific: dashboard */
@@ -648,6 +648,17 @@
   }
 
   function renderSyncNote() {
+    /* The numbers are already on screen from localStorage — a pull only
+       refreshes them. Dimming the two panels it feeds while that is in
+       flight makes the figures visibly settle instead of silently swapping
+       under you. Toggled here rather than at the call sites because this
+       already runs at every point `syncing` changes. renderStats() replaces
+       the grid's children, not the grid itself, so the class survives a
+       re-render. */
+    document.querySelectorAll('#statsGrid, .dash-chart').forEach(panel => {
+      panel.classList.toggle('is-syncing', syncing);
+    });
+
     const el = document.getElementById('syncNote');
     if (!el) return;
     if (!currentUser) el.textContent = 'Log in to see stats synced across devices';

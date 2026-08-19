@@ -19,10 +19,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=5">
+<link rel="stylesheet" href="/css/rotulus.css?v=6">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=5"></script>
+<script defer src="/js/rotulus-shared.js?v=6"></script>
 
 <style>
   /* Page-specific: to-do */
@@ -218,6 +218,12 @@
   let syncing = false;
   let syncFailed = false;
   let state = { categories: [], completions: {} };
+
+  /* True until we know whether a server sync is going to deliver tasks. With
+     no local data we cannot yet tell "you have no tasks" from "your tasks are
+     still on their way", so the empty state would be a lie for a moment.
+     Cleared by every path that has the final answer. */
+  let firstSyncPending = true;
   let addingCategory = false;
   let addingSubcatFor = null; // category id
   let addingTaskFor = null;   // { categoryId, subcatId }
@@ -509,11 +515,24 @@
     });
   }
 
+  /* Stands in for category cards on a first-ever load, so a synced device that
+     has nothing local yet shows something shaped like the content instead of a
+     bare "no categories" message it may be about to contradict. Shared styles
+     live in css/rotulus.css under "Loading placeholders". */
+  const SKELETON_MARKUP =
+    '<div class="skeleton-list" aria-hidden="true">' +
+    '<div class="skeleton-card"></div>' +
+    '<div class="skeleton-card"></div>' +
+    '<div class="skeleton-card"></div>' +
+    '</div>' +
+    '<p class="skeleton-label" role="status">Getting your tasks&hellip;</p>';
+
   function renderCategories() {
     const list = document.getElementById('categoriesList');
 
     if (state.categories.length === 0) {
-      list.innerHTML = '<p class="empty-note">No categories yet. Add one to get started.</p>';
+      list.innerHTML = firstSyncPending ? SKELETON_MARKUP
+        : '<p class="empty-note">No categories yet. Add one to get started.</p>';
       return;
     }
 
@@ -951,8 +970,28 @@
   // ---- Init ----
   // Theme + nav dropdown behavior now lives in /js/rotulus-shared.js.
 
+  /* Render from localStorage on the very first frame. This used to show
+     "Loading your tasks…" and wait for netlifyIdentity.init() plus a
+     pullFromServer() round trip before painting anything — even though the
+     tasks were already on the device. index/goals/diary/pomodoro/dashboard
+     all already work this way; To-Do was the odd one out.
+     applyArchiveDeepLink() deliberately stays out of here: it must only run
+     after a render that has final data, or on a synced device it opens the
+     archive over tasks the pull is about to replace. */
   function initApp() {
-    document.getElementById('categoriesList').innerHTML = '<p class="empty-note">Loading your tasks&hellip;</p>';
+    /* Best-effort: this is now the first code to touch stored data, and state
+       written by an older build could be shaped differently (a category with
+       no `subcategories` array, say). An exception here would propagate out of
+       the DOMContentLoaded handler below and stop initIdentity() from ever
+       running — so bad local data would also cost you login and sync. The
+       identity handlers re-render from server data regardless, so failing
+       quietly here loses nothing but the head start. */
+    try {
+      loadLocal();
+      renderCategories();
+    } catch (e) {
+      console.error('Local render failed; falling back to the synced copy', e);
+    }
     renderAddCategoryArea();
     initArchiveToggle();
   }
@@ -984,6 +1023,7 @@
     if (typeof netlifyIdentity === 'undefined') {
       document.getElementById('authCard').innerHTML =
         '<p class="auth-status">Identity widget failed to load. Check your connection and reload.</p>';
+      firstSyncPending = false;
       loadLocal();
       renderCategories();
       applyArchiveDeepLink();
@@ -998,6 +1038,7 @@
       } else {
         renderAuthLoggedOut();
       }
+      firstSyncPending = false;
       loadLocal();
       renderCategories();
       renderSyncNote();
@@ -1009,6 +1050,7 @@
       renderAuthLoggedIn(user);
       netlifyIdentity.close();
       const pulled = await pullFromServer();
+      firstSyncPending = false;
       loadLocal();
       renderCategories();
       /* Only upload when the download succeeded AND this device actually has
@@ -1035,6 +1077,17 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     initApp();
+
+    /* If the Identity widget loads but never fires 'init' — offline, or the
+       script blocked — nothing would ever clear firstSyncPending and the
+       skeleton would sit there for good. Stop waiting after 6s and show the
+       honest empty state. */
+    setTimeout(() => {
+      if (!firstSyncPending) return;
+      firstSyncPending = false;
+      renderCategories();
+    }, 6000);
+
     if (typeof netlifyIdentity !== 'undefined') {
       initIdentity();
     } else {

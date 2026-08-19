@@ -663,6 +663,81 @@ html[data-vt-dir]::view-transition-new(root) {
 .flash-highlight { animation: rotulus-flash 1.2s var(--ease) 1; }
 
 /* ==========================================================================
+   Loading placeholders
+   --------------------------------------------------------------------------
+   Used sparingly and on purpose. Almost every panel in the app renders from
+   localStorage on DOMContentLoaded, so it already has real content on the
+   first frame — a skeleton there would flash for one frame and read as a
+   flicker, which is worse than nothing.
+
+   These exist for the two places where the wait is real:
+   - a first-ever load on a new device, where there is genuinely nothing local
+     yet and the server pull is the only source (see todo.html)
+   - the dashboard refreshing numbers it is already showing (see its
+     `syncing` flag), so the figures visibly settle rather than silently
+     swapping under you
+
+   Note they cannot help during a page *transition*: the outgoing page is a
+   frozen snapshot while the browser fetches the next document, so nothing can
+   animate in that gap. Shortening it is the only lever, which is what the
+   immutable CSS/JS caching in netlify.toml does.
+
+   Both animations deliberately END on their resting state (opacity: 1). The
+   reduced-motion rule near the top of this file collapses every animation to
+   0.01ms with one iteration, which snaps to the final keyframe — so this
+   degrades to a calm solid block rather than freezing mid-pulse.
+   ========================================================================== */
+
+@keyframes rotulus-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Built from the same background/border/shadow as a real card, so it reads as
+   a card whose contents haven't arrived and the layout doesn't jump when they
+   do. Deliberately NOT var(--line) on its own: that token is a hairline border
+   colour, and as a fill it came out at #E5E1F4 on the #EDEBF7 light background
+   — a difference of about 8/255 per channel, which is invisible. */
+.skeleton-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  height: 64px;
+  animation: rotulus-skeleton-pulse 1.5s var(--ease) infinite;
+}
+
+/* Stagger so the group reads as one loading state rather than three things
+   blinking in lockstep. */
+.skeleton-card:nth-child(2) { animation-delay: 0.15s; }
+.skeleton-card:nth-child(3) { animation-delay: 0.3s; }
+
+.skeleton-label {
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  text-align: center;
+  padding: 14px 0 4px;
+}
+
+/* Content that is already on screen and correct, just being refreshed from
+   the server. Dimmer rather than replaced — the numbers stay readable. */
+@keyframes rotulus-syncing-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.62; }
+}
+
+.is-syncing {
+  animation: rotulus-syncing-pulse 1.4s var(--ease) infinite;
+}
+
+/* ==========================================================================
    Wide layouts: phone landscape and desktop
    --------------------------------------------------------------------------
    Phone portrait is the default above and is left alone. The two wide layouts
