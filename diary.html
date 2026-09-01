@@ -25,6 +25,71 @@
   /* Page-specific: diary */
 
   /* Calendar */
+  /* Search ---------------------------------------------------------------
+     The calendar is the only way in, which is fine at twenty entries and
+     miserable at three hundred: finding "the day I wrote about the marathon"
+     meant clicking back through months. */
+  .search-row { position: relative; margin-bottom: 14px; }
+  .search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 11px 36px 11px 13px;
+    border-radius: var(--r-md, 12px);
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .search-input::placeholder { color: var(--ink-dim); font-weight: 500; }
+  .search-clear {
+    position: absolute;
+    right: 6px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: none; cursor: pointer;
+    color: var(--ink-dim); font-size: 18px; line-height: 1;
+    padding: 4px 8px;
+    display: none;
+  }
+  .search-row.has-query .search-clear { display: block; }
+
+  .search-results { margin-bottom: 18px; }
+  .search-count {
+    font-weight: 800; font-size: 10.5px; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--ink-dim); margin: 0 0 9px;
+  }
+  .search-hit {
+    display: block; width: 100%; text-align: left;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md, 12px);
+    box-shadow: var(--shadow-card);
+    padding: 11px 13px;
+    margin-bottom: 9px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    transition: transform var(--t-fast) var(--ease);
+  }
+  .search-hit:active { transform: scale(0.99); }
+  .search-hit-top { display: flex; align-items: baseline; gap: 9px; margin-bottom: 3px; }
+  .search-hit-date {
+    font-weight: 800; font-size: 10.5px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--primary); flex-shrink: 0;
+  }
+  .search-hit-title {
+    font-weight: 700; font-size: 13.5px; color: var(--ink);
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .search-hit-snippet {
+    margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-dim);
+  }
+  .search-hit mark {
+    background: var(--acc-yellow-soft, rgba(242,185,60,0.3));
+    color: var(--ink);
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+
   .cal-card {
     background: var(--card);
     border: 1px solid var(--line);
@@ -211,6 +276,7 @@
        They are adjacent siblings, so grid auto-placement puts them on the
        same row without any explicit row numbers to go stale. */
     .cal-card { grid-column: 1; }
+    .search-results:not(:empty) { grid-column: 1; }
     .entry-card { grid-column: 2; }
   }
 </style>
@@ -236,6 +302,14 @@
   <div class="auth-card" id="authCard">
     <p class="auth-status">Checking login&hellip;</p>
   </div>
+
+  <div class="search-row" id="searchRow">
+    <input type="search" class="search-input" id="searchInput" maxlength="80"
+           placeholder="Search your diary&hellip;" autocomplete="off"
+           aria-label="Search diary entries">
+    <button class="search-clear" id="searchClear" aria-label="Clear search">&times;</button>
+  </div>
+  <div class="search-results" id="searchResults" role="region" aria-live="polite"></div>
 
   <div class="cal-card">
     <div class="cal-header">
@@ -480,6 +554,132 @@
     });
   }
 
+  /* ---- Search ------------------------------------------------------------
+     Searches titles and bodies of everything already in memory — diaryEntries
+     is the whole diary, so there is nothing to fetch and no index to keep in
+     step. Results replace the calendar while a query is active and put it back
+     the moment the box is emptied. */
+  let searchQuery = '';
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Escaped before it ever reaches a RegExp, or a stray "(" throws mid-typing.
+  function highlight(text, query) {
+    const safe = escapeHtml(text);
+    const needle = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return safe.replace(new RegExp('(' + needle + ')', 'gi'), '<mark>$1</mark>');
+  }
+
+  /* A window around the first match rather than the opening words, so the hit is
+     always visible in the snippet even in a long entry. */
+  function snippetAround(text, query) {
+    const at = text.toLowerCase().indexOf(query.toLowerCase());
+    if (at === -1) return text.slice(0, 140) + (text.length > 140 ? '\u2026' : '');
+    const start = Math.max(0, at - 45);
+    const end = Math.min(text.length, at + query.length + 95);
+    return (start > 0 ? '\u2026' : '') + text.slice(start, end) + (end < text.length ? '\u2026' : '');
+  }
+
+  function searchEntries(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return Object.keys(diaryEntries)
+      .filter(function (date) {
+        const e = diaryEntries[date] || {};
+        return String(e.title || '').toLowerCase().indexOf(q) !== -1
+            || String(e.text || '').toLowerCase().indexOf(q) !== -1;
+      })
+      .sort()
+      .reverse();   // newest first: recent entries are what you are usually after
+  }
+
+  function renderSearch() {
+    const row = document.getElementById('searchRow');
+    const results = document.getElementById('searchResults');
+    const calCard = document.querySelector('.cal-card');
+    if (!row || !results) return;
+
+    const q = searchQuery.trim();
+    row.classList.toggle('has-query', q.length > 0);
+
+    if (!q) {
+      results.innerHTML = '';
+      if (calCard) calCard.style.display = '';
+      return;
+    }
+
+    if (calCard) calCard.style.display = 'none';
+    const hits = searchEntries(q);
+
+    if (!hits.length) {
+      results.innerHTML = '<p class="search-count">No entries match &ldquo;' + escapeHtml(q) + '&rdquo;</p>';
+      return;
+    }
+
+    results.innerHTML =
+      '<p class="search-count">' + hits.length + ' entr' + (hits.length === 1 ? 'y' : 'ies') + '</p>' +
+      hits.map(function (date) {
+        const e = diaryEntries[date] || {};
+        const [y, m, d] = date.split('-').map(Number);
+        const label = new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+        const title = e.title ? highlight(e.title, q) : '<span style="color:var(--ink-dim); font-style:italic;">Untitled</span>';
+        const body = String(e.text || '');
+        const snippet = body ? highlight(snippetAround(body, q), q) : '';
+        return '<button class="search-hit" data-date="' + date + '">' +
+          '<span class="search-hit-top">' +
+            '<span class="search-hit-date">' + label + '</span>' +
+            '<span class="search-hit-title">' + title + '</span>' +
+          '</span>' +
+          (snippet ? '<p class="search-hit-snippet">' + snippet + '</p>' : '') +
+          '</button>';
+      }).join('');
+
+    results.querySelectorAll('.search-hit').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const [y, m, d] = btn.dataset.date.split('-').map(Number);
+        selectedDate = new Date(y, m - 1, d);
+        // The calendar tracks its own month, so jumping to an older entry has
+        // to move it too — otherwise it stays on the current month and the day
+        // you just opened is nowhere to be seen on it.
+        viewYear = y;
+        viewMonth = m - 1;
+        clearSearch();
+        renderCalendar();
+        renderEntryPanel();
+        renderPomodoroMini();
+        const panel = document.querySelector('.entry-card') || document.getElementById('entryDateLabel');
+        if (panel && panel.scrollIntoView) panel.scrollIntoView({ block: 'center' });
+      });
+    });
+  }
+
+  function clearSearch() {
+    searchQuery = '';
+    const input = document.getElementById('searchInput');
+    if (input) input.value = '';
+    renderSearch();
+  }
+
+  function initSearch() {
+    const input = document.getElementById('searchInput');
+    const clear = document.getElementById('searchClear');
+    if (!input) return;
+    input.addEventListener('input', function () {
+      searchQuery = input.value;
+      renderSearch();
+    });
+    // The native clear button on type="search" fires a search event, not input.
+    input.addEventListener('search', function () {
+      searchQuery = input.value;
+      renderSearch();
+    });
+    if (clear) clear.addEventListener('click', clearSearch);
+  }
+
   // ---- Entry panel ----
 
   function renderRatingRow(currentRating) {
@@ -617,6 +817,7 @@
     renderEntryPanel();
     renderPomodoroMini();
     initMonthNav();
+    initSearch();
 
     document.getElementById('saveEntryBtn').addEventListener('click', handleSaveEntry);
   }
@@ -642,6 +843,7 @@
       renderCalendar();
       renderEntryPanel();
       renderPomodoroMini();
+      renderSearch();
       renderSyncNote();
     });
 

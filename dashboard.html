@@ -172,6 +172,76 @@
   }
   .range-btn.selected { background: var(--primary); color: var(--on-primary); }
 
+  /* Weekly trends -------------------------------------------------------
+     Plain flexbox bars rather than a charting library — the app has no build
+     step and no dependencies, and eight bars do not justify either. Heights
+     are a percentage of the tallest week in view, so the shape of the trend
+     is always readable regardless of scale. */
+  .trend-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    padding: 16px 14px 12px;
+  }
+  .trend-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 7px;
+    height: 132px;
+    margin-bottom: 8px;
+  }
+  .trend-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    min-width: 0;
+    gap: 5px;
+  }
+  .trend-value {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+  .trend-col.is-current .trend-value { color: var(--acc); }
+  .trend-bar {
+    width: 100%;
+    min-height: 3px;
+    border-radius: 5px 5px 3px 3px;
+    background: var(--acc-soft);
+    border-bottom: 3px solid var(--acc);
+    transition: height var(--t-med) var(--ease);
+  }
+  .trend-col.is-current .trend-bar { background: var(--acc); }
+  .trend-col.is-empty .trend-bar { background: var(--line); border-bottom-color: var(--line); }
+  .trend-labels { display: flex; gap: 7px; }
+  .trend-label {
+    flex: 1;
+    text-align: center;
+    font-weight: 800;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .trend-summary {
+    margin: 10px 0 0;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+  .trend-summary strong { color: var(--ink); }
+
   .chart-card {
     background: var(--card);
     border: 1px solid var(--line);
@@ -283,6 +353,17 @@
     <div class="chart-legend" id="chartLegend"></div>
   </div>
 
+  </div>
+
+  <div class="dash-trends">
+  <p class="chart-section-title">Weekly trends</p>
+  <div class="range-toggle-row" id="trendToggleRow">
+    <button class="range-btn selected" data-metric="focus">Focus</button>
+    <button class="range-btn" data-metric="habits">Habits</button>
+    <button class="range-btn" data-metric="goals">Goal hours</button>
+    <button class="range-btn" data-metric="diary">Diary</button>
+  </div>
+  <div class="trend-card" id="trendCard"></div>
   </div>
 
   <p class="sync-note" id="syncNote" role="status" aria-live="polite"></p>
@@ -603,11 +684,156 @@
     `).join('');
   }
 
+  /* ---- Weekly trends ----------------------------------------------------
+     The dashboard only ever showed today. Every metric here comes from data the
+     app already stores one key per day, so this needs no new storage and no new
+     sync — it is purely a second reading of what is already there.
+
+     Weeks start Monday and the last column is the week in progress, which is
+     why it is drawn differently: comparing a part-week against finished ones
+     would otherwise read as a collapse in effort every Monday. */
+  const TREND_WEEKS = 8;
+  const HABIT_PREFIX = 'scrollswap_';
+  const DIARY_PREFIX = 'diary_';
+
+  const TREND_METRICS = {
+    focus:  { label: 'Focus', accent: 'var(--acc-orange)', soft: 'var(--acc-orange-soft)', unit: 'min', noun: 'focus time' },
+    habits: { label: 'Habits', accent: 'var(--acc-sky)', soft: 'var(--acc-sky-soft)', unit: '', noun: 'habits ticked' },
+    goals:  { label: 'Goal hours', accent: 'var(--acc-green)', soft: 'var(--acc-green-soft)', unit: 'h', noun: 'logged hours' },
+    diary:  { label: 'Diary', accent: 'var(--acc-purple)', soft: 'var(--acc-purple-soft)', unit: '', noun: 'diary entries' },
+  };
+
+  let trendMetric = 'focus';
+
+  // Monday of the week containing d. getDay() is 0 for Sunday, hence the shift.
+  function mondayOf(d) {
+    const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const shift = (out.getDay() + 6) % 7;
+    out.setDate(out.getDate() - shift);
+    return out;
+  }
+
+  function readJSON(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function dayValue(metric, key) {
+    if (metric === 'focus') {
+      const day = readJSON(POMODORO_PREFIX + key);
+      if (!day) return 0;
+      return Object.keys(day).reduce((sum, id) => sum + (Number(day[id]) || 0), 0);
+    }
+    if (metric === 'habits') {
+      const day = readJSON(HABIT_PREFIX + key);
+      if (!day || typeof day !== 'object') return 0;
+      return Object.keys(day).filter(k => day[k] === true).length;
+    }
+    if (metric === 'diary') {
+      const entry = readJSON(DIARY_PREFIX + key);
+      return entry && (entry.title || entry.text) ? 1 : 0;
+    }
+    if (metric === 'goals') {
+      const st = readJSON(GOALS_STATE_KEY);
+      const goals = (st && Array.isArray(st.goals)) ? st.goals : [];
+      return goals.reduce((sum, g) => sum + (Number((g.dailyHours || {})[key]) || 0), 0);
+    }
+    return 0;
+  }
+
+  function trendWeeks(metric) {
+    const weeks = [];
+    const thisMonday = mondayOf(new Date());
+    for (let w = TREND_WEEKS - 1; w >= 0; w--) {
+      const start = new Date(thisMonday);
+      start.setDate(start.getDate() - w * 7);
+      let total = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        if (d > new Date()) break;   // never count days that have not happened
+        total += dayValue(metric, dateKeyFromDate(d));
+      }
+      weeks.push({ start, total, current: w === 0 });
+    }
+    return weeks;
+  }
+
+  function formatTrendValue(metric, v) {
+    if (!v) return '0';
+    if (metric === 'goals') return (Math.round(v * 10) / 10) + '';
+    return Math.round(v) + '';
+  }
+
+  function renderTrends() {
+    const card = document.getElementById('trendCard');
+    if (!card) return;
+    const cfg = TREND_METRICS[trendMetric];
+    const weeks = trendWeeks(trendMetric);
+    const max = Math.max.apply(null, weeks.map(w => w.total));
+
+    if (!max) {
+      card.innerHTML = '<p class="chart-empty-note">Nothing logged in the last ' +
+        TREND_WEEKS + ' weeks. Once you do, your ' + cfg.noun + ' will show up here week by week.</p>';
+      return;
+    }
+
+    // Compare only finished weeks; the week in progress is always behind.
+    const finished = weeks.filter(w => !w.current);
+    const avg = finished.length ? finished.reduce((s, w) => s + w.total, 0) / finished.length : 0;
+    const last = weeks[weeks.length - 1];
+    const bars = weeks.map(w => {
+      const pct = max ? Math.round((w.total / max) * 100) : 0;
+      const cls = 'trend-col' + (w.current ? ' is-current' : '') + (w.total === 0 ? ' is-empty' : '');
+      return '<div class="' + cls + '">' +
+        '<span class="trend-value">' + formatTrendValue(trendMetric, w.total) + '</span>' +
+        '<div class="trend-bar" style="height: ' + Math.max(pct, 2) + '%"></div>' +
+        '</div>';
+    }).join('');
+
+    const labels = weeks.map(w =>
+      '<span class="trend-label">' +
+      w.start.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) +
+      '</span>'
+    ).join('');
+
+    let summary;
+    if (!finished.length) {
+      summary = 'First week of tracking.';
+    } else {
+      const unit = cfg.unit ? ' ' + cfg.unit : '';
+      summary = 'This week so far: <strong>' + formatTrendValue(trendMetric, last.total) + unit +
+        '</strong> &middot; usual week: <strong>' + formatTrendValue(trendMetric, avg) + unit + '</strong>';
+    }
+
+    card.style.setProperty('--acc', cfg.accent);
+    card.style.setProperty('--acc-soft', cfg.soft);
+    card.innerHTML =
+      '<div class="trend-bars" role="img" aria-label="' + cfg.label + ' per week for the last ' + TREND_WEEKS + ' weeks">' + bars + '</div>' +
+      '<div class="trend-labels">' + labels + '</div>' +
+      '<p class="trend-summary">' + summary + '</p>';
+  }
+
+  function initTrendToggle() {
+    document.querySelectorAll('#trendToggleRow .range-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        trendMetric = btn.dataset.metric;
+        document.querySelectorAll('#trendToggleRow .range-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        renderTrends();
+      });
+    });
+  }
+
+  /* Scoped to #rangeToggleRow: the trend buttons reuse .range-btn for its
+     styling, and an unscoped selector would wire both rows to both handlers. */
   function initChartToggle() {
-    document.querySelectorAll('.range-btn').forEach(btn => {
+    document.querySelectorAll('#rangeToggleRow .range-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         chartRange = parseInt(btn.dataset.range, 10);
-        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelectorAll('#rangeToggleRow .range-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         renderChart();
       });
@@ -671,6 +897,8 @@
     renderQuote();
     renderStats();
     renderChart();
+    renderTrends();
+    initTrendToggle();
     initChartToggle();
     initLockInConfirm();
   }
@@ -693,6 +921,7 @@
       }
       renderStats();
       renderChart();
+      renderTrends();
       renderSyncNote();
     });
     netlifyIdentity.on('login', async user => {
@@ -705,6 +934,7 @@
       syncing = false;
       renderStats();
       renderChart();
+      renderTrends();
       renderSyncNote();
     });
     netlifyIdentity.on('logout', () => { currentUser = null; renderAuthLoggedOut(); renderSyncNote(); });

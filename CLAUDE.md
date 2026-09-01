@@ -314,6 +314,42 @@ the tasks themselves.
   raised as an accessibility problem and the user explicitly chose to keep it.
   Do not "fix" it.
 
+## Weekly trends (`dashboard.html`) and diary search (`diary.html`)
+
+Added 2026-09-02. Both read data the app already stores one key per day, so
+neither needed new storage, new sync or a new function — and both are entirely
+page-specific CSS/JS, so **neither needed a `?v=` bump.**
+
+- **Trends are plain flexbox bars**, not a charting library: no build step, no
+  dependencies, and eight bars do not justify either. Heights are a percentage of
+  the tallest week in view, so the shape reads at any scale.
+- **Weeks start Monday** (`mondayOf()` shifts `getDay()`, which is 0 on Sunday),
+  and days in the future are never counted.
+- **The week in progress is drawn differently and excluded from the average.**
+  Comparing a part-week against finished ones would read as a collapse in effort
+  every Monday morning. The summary line says "this week so far" against "usual
+  week" for exactly that reason.
+- Four metrics — focus minutes (`pomodoro_*`), habits ticked (`scrollswap_<date>`,
+  counting `true` values), goal hours (`dailyHours` across goals) and diary
+  entries. Each sets `--acc`/`--acc-soft` on the card so the bars recolour.
+- **`initChartToggle()` had to be scoped to `#rangeToggleRow`.** The trend buttons
+  reuse `.range-btn` for its styling, and the old unscoped
+  `querySelectorAll('.range-btn')` would have wired both rows to both handlers.
+- **Diary search filters `diaryEntries`**, which is already the whole diary in
+  memory — nothing to fetch, no index to keep in step. Results replace the
+  calendar while a query is active and restore it when the box is emptied.
+- **The query is regex-escaped before it reaches `new RegExp`**, or typing a bare
+  `(` throws mid-search. Snippets are a window around the first match rather than
+  the opening words, so the hit is visible even in a long entry.
+- **Opening a hit moves `viewYear`/`viewMonth` too.** The calendar tracks its own
+  month independently of `selectedDate`, so without that it stays on the current
+  month and the day you just opened is not on screen.
+- In the wide layouts, `.search-results:not(:empty)` takes `grid-column: 1` — the
+  calendar's slot. Without it the entry card sits in column 2 beside an empty
+  column 1. A named class beats the zero-specificity `:where(#app) > *` default.
+- A server pull can bring in entries this device has never seen, so the pull path
+  re-runs `renderSearch()` rather than leaving stale hits on screen.
+
 ## Design system (added in the Rotulus redesign)
 
 - **`css/rotulus.css`** — all shared tokens (colors, radii, shadows, motion,
