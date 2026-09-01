@@ -16,13 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=6">
+<link rel="stylesheet" href="/css/rotulus.css?v=7">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=6"></script>
+<script defer src="/js/rotulus-shared.js?v=7"></script>
 
 <style>
   /* Page-specific: diary */
@@ -253,13 +250,13 @@
     <p class="entry-date" id="entryDateLabel"></p>
 
     <p class="field-label">Title</p>
-    <input type="text" class="title-input" id="titleInput" placeholder="A word or two for the day">
+    <input type="text" maxlength="80" class="title-input" id="titleInput" placeholder="A word or two for the day">
 
     <p class="field-label">Productivity rating</p>
     <div class="rating-row" id="ratingRow"></div>
 
     <p class="field-label">What did you do today?</p>
-    <textarea class="log-textarea" id="logTextarea" rows="5" placeholder="Write freely&hellip;"></textarea>
+    <textarea class="log-textarea" id="logTextarea" maxlength="20000" rows="5" placeholder="Write freely&hellip;"></textarea>
 
     <button class="save-btn" id="saveEntryBtn">Save entry</button>
     <p class="save-note" id="saveNote"></p>
@@ -270,7 +267,8 @@
     <div id="pomoMiniList"></div>
   </div>
 
-  <p class="sync-note" id="syncNote"></p>
+  <p class="sync-note" id="syncNote" role="status" aria-live="polite"></p>
+  <span class="offline-pill">Offline &mdash; saved on this device</span>
 </div>
 
 <script>

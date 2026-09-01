@@ -1,3 +1,31 @@
+/* Self-hosted fonts -------------------------------------------------------
+   These used to come from a render-blocking <link> to fonts.googleapis.com in
+   every page's <head>. That is exactly what the Navigation notes warn against:
+   during a cross-document view transition the browser holds the outgoing page
+   as a still bitmap until the new one can paint, so a third-party stylesheet
+   there stretched the frozen gap on every single tab switch — a DNS lookup, a
+   TLS handshake and a request before anything could render.
+
+   Both files are the variable font, so one file covers every weight the app
+   uses. The latin subset is U+0000-00FF and up, which includes the Norwegian
+   letters. Served from /assets/*, cached a year and immutable — so if either
+   file is ever REPLACED it needs a new filename, not an overwrite. Also means
+   the app now renders in its own fonts offline. */
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/assets/fonts/baloo2-latin-var.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('/assets/fonts/nunito-latin-var.woff2') format('woff2');
+}
+
 /* ==========================================================================
    Rotulus design system
    Shared across every page. Tokens first, then shared components.
@@ -870,4 +898,73 @@ html[data-vt-dir]::view-transition-new(root) {
   .title { font-size: 24px; }
   .eyebrow, .subtitle { display: none; }
   #app { padding-bottom: 20px; }
+}
+
+/* Undo snackbar -----------------------------------------------------------
+   Replaces the blocking confirm() that guarded deletes on To-Do and Goals. A
+   modal you have to dismiss before you can look at anything trains you to tap
+   OK without reading it, which is the opposite of a safeguard; letting the
+   delete happen and offering it back for a few seconds is both calmer and
+   genuinely safer. The delete IS persisted immediately — undo re-adds and
+   persists again — so memory and storage never disagree, even if you navigate
+   away mid-countdown. */
+.rotulus-snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h, 58px) + 14px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(8px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(440px, calc(100vw - 28px));
+  padding: 11px 14px;
+  border-radius: var(--r-md, 12px);
+  background: var(--ink);
+  color: var(--card);
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.rotulus-snackbar.is-open { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.rotulus-snackbar-text { flex: 1; min-width: 0; }
+.rotulus-snackbar-undo {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--acc-sky);
+  padding: 2px 4px;
+}
+
+/* Offline pill — nothing in the app said anything about being offline before,
+   so an entry written on a train looked identical to one that had synced. */
+.offline-pill {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-weight: 700;
+  font-size: 11.5px;
+  color: var(--ink-dim);
+}
+.offline-pill.is-offline { display: inline-flex; }
+.offline-pill::before {
+  content: '';
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--acc-orange);
+  flex-shrink: 0;
 }

@@ -16,13 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=6">
+<link rel="stylesheet" href="/css/rotulus.css?v=7">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=6"></script>
+<script defer src="/js/rotulus-shared.js?v=7"></script>
 
 <style>
   /* Page-specific: settings */
@@ -123,6 +120,19 @@
       <button class="seg-btn" data-keepalive="on">On</button>
     </div>
     <p class="gear-note">Off keeps your music playing. On plays a near-silent background track so the chime lands exactly at zero even with the phone locked &mdash; but your phone will pause Spotify, or any other music, for the whole session.</p>
+  </div>
+
+  <div class="section-card">
+    <p class="section-title">Your data</p>
+
+    <label class="setting-label">Backup</label>
+    <button class="auth-btn secondary" id="exportBtn" style="width:100%;">Download my data</button>
+    <p class="gear-note" style="margin-top:10px;">Saves everything &mdash; habits, tasks, goals, diary and Pomodoro history &mdash; as a single file you keep. Worth doing now and again: clearing your browser data would otherwise erase it all.</p>
+
+    <label class="setting-label" style="margin-top:16px;">Restore</label>
+    <button class="auth-btn secondary" id="importBtn" style="width:100%;">Restore from a file&hellip;</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
+    <p class="gear-note" id="importNote" style="margin-top:10px;">Replaces what is on this device with the contents of a backup file. You will be asked to confirm first.</p>
   </div>
 </div>
 
@@ -258,6 +268,155 @@
     renderKeepAliveToggle();
   }
 
+  /* ---- Backup and restore ----------------------------------------------
+     The only way data can leave this app. Everything lives in localStorage and
+     in Netlify Blobs behind a token that has expired once already, so a file the
+     user actually holds is the only real safety net.
+
+     Sweeps all three prefixes wholesale. Deliberately NOT isScrollSwapOwnKey()
+     from index.html: that one narrows to habit dates and the labels key, which
+     is right for the habit sync and wrong for a backup — it would silently drop
+     tasks, goals, the diary and every setting. */
+  const DATA_PREFIXES = ['scrollswap_', 'pomodoro_', 'diary_'];
+  const BACKUP_VERSION = 1;
+
+  function isOwnDataKey(key) {
+    return !!key && DATA_PREFIXES.some(function (p) { return key.startsWith(p); });
+  }
+
+  function collectAllData() {
+    const keys = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!isOwnDataKey(key)) continue;
+      keys[key] = localStorage.getItem(key);   // raw strings; nothing reparsed, so nothing to go wrong
+    }
+    return keys;
+  }
+
+  function setImportNote(msg, bad) {
+    const el = document.getElementById('importNote');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = bad ? 'var(--danger)' : '';
+  }
+
+  function exportData() {
+    try {
+      const keys = collectAllData();
+      const count = Object.keys(keys).length;
+      if (!count) { setImportNote('Nothing to back up yet - this device has no Rotulus data.', true); return; }
+      const payload = {
+        app: 'rotulus',
+        version: BACKUP_VERSION,
+        exportedAt: new Date().toISOString(),
+        keys: keys,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rotulus-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Revoking straight away can cancel the download on some browsers; give it a beat.
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      setImportNote('Backed up ' + count + ' item' + (count === 1 ? '' : 's') + '. Keep the file somewhere safe.', false);
+    } catch (e) {
+      setImportNote('Could not build the backup file: ' + (e.message || e), true);
+    }
+  }
+
+  /* Refuses anything it does not recognise rather than guessing. A restore
+     overwrites real data, so a half-understood file is worse than no restore. */
+  function parseBackup(text) {
+    let data;
+    try { data = JSON.parse(text); }
+    catch (e) { return { error: 'That file is not valid JSON.' }; }
+    if (!data || typeof data !== 'object') return { error: 'That file is not a Rotulus backup.' };
+    if (data.app !== 'rotulus') return { error: 'That file is not a Rotulus backup.' };
+    if (data.version !== BACKUP_VERSION) {
+      return { error: 'That backup was made by a different version of Rotulus (v' + data.version + '), so it cannot be restored safely.' };
+    }
+    if (!data.keys || typeof data.keys !== 'object') return { error: 'That backup has no data in it.' };
+    const keys = {};
+    Object.keys(data.keys).forEach(function (k) {
+      // Never write a key outside our own prefixes, whatever the file claims.
+      if (!isOwnDataKey(k)) return;
+      if (typeof data.keys[k] !== 'string') return;
+      keys[k] = data.keys[k];
+    });
+    if (!Object.keys(keys).length) return { error: 'That backup has no Rotulus data in it.' };
+    return { keys: keys, exportedAt: data.exportedAt };
+  }
+
+  let pendingRestore = null;
+
+  function applyRestore(keys) {
+    // Clear our own keys first, so anything deleted since the backup does not survive it.
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (isOwnDataKey(key)) doomed.push(key);
+    }
+    doomed.forEach(function (k) { localStorage.removeItem(k); });
+    Object.keys(keys).forEach(function (k) { localStorage.setItem(k, keys[k]); });
+  }
+
+  function initBackupButtons() {
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const fileInput = document.getElementById('importFile');
+    if (!exportBtn || !importBtn || !fileInput) return;
+
+    exportBtn.addEventListener('click', exportData);
+
+    /* Two taps rather than confirm(): the blocking dialog is jarring on iOS, and
+       the button relabelling itself makes what is about to happen much plainer
+       than an OK/Cancel box does. */
+    importBtn.addEventListener('click', function () {
+      if (pendingRestore) {
+        const keys = pendingRestore;
+        pendingRestore = null;
+        try {
+          applyRestore(keys);
+          setImportNote('Restored. Reloading...', false);
+          setTimeout(function () { location.reload(); }, 600);
+        } catch (e) {
+          setImportNote('Restore failed: ' + (e.message || e), true);
+          importBtn.textContent = 'Restore from a file...';
+        }
+        return;
+      }
+      fileInput.value = '';   // so picking the same file twice still fires change
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        const result = parseBackup(String(reader.result || ''));
+        if (result.error) {
+          pendingRestore = null;
+          importBtn.textContent = 'Restore from a file...';
+          setImportNote(result.error, true);
+          return;
+        }
+        const count = Object.keys(result.keys).length;
+        const when = result.exportedAt ? new Date(result.exportedAt).toLocaleDateString() : 'an unknown date';
+        pendingRestore = result.keys;
+        importBtn.textContent = 'Tap again to replace everything';
+        setImportNote('This backup holds ' + count + ' item' + (count === 1 ? '' : 's') + ' from ' + when +
+          '. Restoring replaces all Rotulus data on this device. Tap the button again to go ahead, or reload the page to cancel.', true);
+      };
+      reader.onerror = function () { setImportNote('Could not read that file.', true); };
+      reader.readAsText(file);
+    });
+  }
+
   /* iOS only grants notification permission from a user gesture, and only in a
      PWA added to the Home Screen. Asking from a button here rather than on the
      first Start keeps the permission sheet away from the moment the app is
@@ -306,6 +465,7 @@
     initAlarmToggle();
     initKeepAliveToggle();
     initNotifyButton();
+    initBackupButtons();
   }
 
   function initIdentity() {

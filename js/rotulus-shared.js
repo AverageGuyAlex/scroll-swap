@@ -46,9 +46,68 @@
     if (meta) meta.setAttribute('content', effective === 'dark' ? '#151020' : '#EDEBF7');
   }
 
+  /* ---- Undo snackbar ---------------------------------------------------
+     One at a time: opening a second commits the first, so a rapid series of
+     deletes can never leave two pending undos racing each other. */
+  var snackEl = null;
+  var snackTimer = null;
+  var snackCommit = null;
+
+  function closeSnackbar(commit) {
+    if (snackTimer) { clearTimeout(snackTimer); snackTimer = null; }
+    var commitFn = snackCommit;
+    snackCommit = null;
+    if (snackEl) snackEl.classList.remove('is-open');
+    if (commit && typeof commitFn === 'function') { try { commitFn(); } catch (e) {} }
+  }
+
+  function showSnackbar(text, onUndo, onCommit, ms) {
+    closeSnackbar(true);   // whatever was pending is now settled
+    if (!snackEl) {
+      snackEl = document.createElement('div');
+      snackEl.className = 'rotulus-snackbar';
+      snackEl.setAttribute('role', 'status');
+      snackEl.innerHTML = '<span class="rotulus-snackbar-text"></span>' +
+        '<button type="button" class="rotulus-snackbar-undo">Undo</button>';
+      document.body.appendChild(snackEl);
+      snackEl.querySelector('.rotulus-snackbar-undo').addEventListener('click', function () {
+        if (snackTimer) { clearTimeout(snackTimer); snackTimer = null; }
+        snackCommit = null;                       // undoing means never committing
+        snackEl.classList.remove('is-open');
+        if (typeof snackEl._undo === 'function') { try { snackEl._undo(); } catch (e) {} }
+      });
+    }
+    snackEl.querySelector('.rotulus-snackbar-text').textContent = text;
+    snackEl._undo = onUndo;
+    snackCommit = onCommit;
+    snackEl.classList.add('is-open');
+    snackTimer = setTimeout(function () { closeSnackbar(true); }, ms || 5000);
+  }
+
+  /* ---- Offline awareness ------------------------------------------------
+     A page opts in by putting <span class="offline-pill">…</span> next to its
+     sync note; this only toggles the class and re-runs whatever the page gave
+     us to flush when the connection comes back. */
+  var onReconnect = null;
+
+  function renderOfflineState() {
+    var offline = navigator.onLine === false;
+    var pills = document.querySelectorAll('.offline-pill');
+    for (var i = 0; i < pills.length; i++) pills[i].classList.toggle('is-offline', offline);
+    if (!offline && typeof onReconnect === 'function') {
+      try { onReconnect(); } catch (e) {}
+    }
+  }
+
+  window.addEventListener('online', renderOfflineState);
+  window.addEventListener('offline', renderOfflineState);
+  document.addEventListener('DOMContentLoaded', renderOfflineState);
+
   window.rotulus = {
     getTheme: getTheme,
     applyTheme: function (theme) { applyTheme(theme, true); },
+    snackbar: showSnackbar,
+    onReconnect: function (fn) { onReconnect = fn; renderOfflineState(); },
   };
 
   // Follow the device setting live, but only while the user hasn't

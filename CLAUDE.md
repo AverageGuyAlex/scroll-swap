@@ -82,15 +82,27 @@ file with two things swapped: the Blobs store name and the empty-state default a
 `GET` returns. Change one and you almost certainly need to change all six —
 `tests/functions-test.js` runs every one of them, so it will tell you.
 
-- **They are legacy V1 functions** (`exports.handler = async (event, context)`,
-  reading `context.clientContext.user`). That matters: V2 functions get Netlify
-  Blobs configured automatically, **V1 ones do not**. So `BLOBS_SITE_ID` and
-  `BLOBS_TOKEN` (set in the Netlify UI, not in `netlify.toml`) are required, not
-  optional.
-- **`BLOBS_TOKEN` is a personal access token, and those expire or get revoked.**
-  When that happens all six functions fail at once, on every device, with no code
-  change on your side — the app shows "Sync failed" everywhere and nothing in the
-  repo explains why. That is the first thing to check when sync breaks.
+- **They are V2 functions** (`export default async (req, context)`, `.mjs`,
+  Request in and Response out), converted from V1 on 2026-09-02. **That was the
+  whole point:** V1 does not get Netlify Blobs configured for it, so every one of
+  these files needed `BLOBS_SITE_ID` and a `BLOBS_TOKEN` personal access token
+  set by hand — and when that token expired on 2026-08-19, all six failed at once
+  on every device, with no code change and nothing in the repo to explain it. V2
+  configures Blobs itself: `getStore({ name })` takes no credentials, there is no
+  env-var branch left, and **that outage cannot recur**.
+- **`.mjs`, not `.js`** — V2 requires ES module syntax, and `package.json` has no
+  `"type": "module"` (adding one would break every `require()` in `tests/`). The
+  route is the filename minus its extension, so `/.netlify/functions/todos` is
+  unchanged. Do not rename the basenames.
+- **Testing them needs a source transform.** `@netlify/blobs` used to be stubbed
+  by patching `Module._load`, which an ESM `import` walks straight past.
+  `tests/functions-test.js` now reads each file, swaps the single import line for
+  an injected `getStore`, and evaluates the body — the same trick `sync-test.js`
+  and `alarm-test.js` already use on page scripts. It asserts the shape of these
+  files strictly and throws if they drift from the template.
+- **One test guards the whole point of the migration:** getStore must be called
+  with `['name']` and nothing else. Passing a siteID or token back in would
+  quietly reintroduce the expiring credential.
 - **The 401 check must stay first**, before the env-var check and before any store
   access. It is the only thing standing between a stranger and the data, and its
   body deliberately says nothing about configuration — an unauthenticated caller
@@ -200,12 +212,114 @@ and a `.flash-highlight` pulse on the timer card.
   `/assets/*` is cached for a year, a changed sound needs a **new filename**,
   not an overwrite.
 
+## Backup and restore (`settings.html`)
+
+The only way data leaves the app, and the reason the rest of the 2026-09-02 batch
+was safe to ship. Everything lives in localStorage plus Blobs; clearing site data
+used to be unrecoverable.
+
+- **Export sweeps all three prefixes wholesale** (`scrollswap_`, `pomodoro_`,
+  `diary_`) and writes `{ app, version, exportedAt, keys }`, values kept as raw
+  strings so nothing is reparsed. **Deliberately NOT `isScrollSwapOwnKey()`** from
+  `index.html`: that narrows to habit dates and the labels key, which is right for
+  the habit sync and would silently drop tasks, goals, the diary and every setting
+  from a backup.
+- **Import refuses anything it does not recognise** — wrong `app`, unknown
+  `version`, no matching keys — rather than guessing, and it drops any key outside
+  the three prefixes whatever the file claims. It clears our own keys first, so
+  items deleted since the backup do not survive the restore.
+- Confirmation is a **second tap on the relabelled button**, not `confirm()`.
+
+## To-Do and Goals merge (the data-loss fix)
+
+Until 2026-09-02 both pages did `state = serverState; saveLocal()` on every pull.
+Last writer won and the other device's work vanished with no error, on any
+divergence — aeroplane mode, a dead signal, or just phone-then-laptop.
+
+- Merge is **by item `id`** (`uid()` has always produced stable ones), with
+  `updatedAt` settling conflicts and **tombstones** (`state.deletedIds`) so a
+  delete is not resurrected by the other device's copy.
+- **A missing `updatedAt` counts as 0**, so anything saved before this shipped
+  loses to a stamped edit rather than winning by accident.
+- **A tombstone loses to an item edited after it** — re-adding something on one
+  device survives a stale delete from the other.
+- **Children merge regardless of which parent won**, or renaming a category on one
+  device would drop the other's new tasks along with it.
+- Tombstones are pruned at 90 days; without that they grow forever.
+- Goals additionally merges `dailyHours` key by key and unions
+  `linkedCategoryIds` — hours logged on two devices on different days are both
+  real, and losing a link silently is worse than keeping both.
+- **Habits, Pomodoro and Diary need none of this** and were never affected: one
+  key per day means a pull only ever adds days, so they heal on their own.
+- 13 scenarios in `tests/sync-test.js` guard it. The login-path guard
+  `if (pulled && hasLocalData())` is unchanged — merging changes what a pull
+  *does*, never whether an upload may run.
+
+## To-Do colour groups and sorting
+
+- **The colour IS the group.** A category carries a group **id** (`cat.group`),
+  not a hex string, so its swatch follows the light/dark palette instead of
+  freezing a shade. Six fixed colours replace the old free `<input type="color">`,
+  which let every category be its own colour — that was the clutter.
+- Categories saved before this hold arbitrary hex and are snapped to the nearest
+  palette colour once by RGB distance, inside the same `try`/`catch` as the local
+  render. **`initApp()` must not be able to throw.**
+- **Only non-empty groups render**, so six headings never appear before use.
+- Group names live in the synced blob (`state.groupNames`); collapsed state is a
+  per-device preference (`scrollswap_todo_collapsed_groups`), as is the sort
+  (`scrollswap_todo_sort`). Both are read **before** the first render, or the list
+  paints unsorted and expanded and then visibly rearranges itself.
+- Sorting is within a group. "Newest" reads `createdAt`, falling back to decoding
+  the timestamp out of `uid()` (`Date.now().toString(36)` plus five characters)
+  for categories that predate the field.
+- `escapeHtml()` was added here — names were being interpolated into markup raw.
+
+## Goals: linked To-Do categories
+
+Milestones were free text you had to tick a second time, in a second place. A goal
+now points at the To-Do categories that move it forward, and the tick comes from
+the tasks themselves.
+
+- `goal.linkedCategoryIds`; the To-Do state is read straight out of localStorage
+  the way `dashboard.html` reads other pages' keys. No second sync.
+- **Progress is derived on every render and never stored**, so it cannot drift.
+- A category deleted in To-Do renders as "Category removed" with an unlink button
+  — it must not vanish silently or throw on the missing object.
+- **The stored `milestones` array is deliberately left in place**, just not
+  rendered, so nothing is thrown away and this is reversible.
+- The row markup reuses the `.milestone-*` styles; only the source of the tick
+  changed.
+
+## Undo, offline, and the shared snackbar
+
+- **`confirm()` is gone from the app.** A modal you must dismiss before you can
+  look at anything trains you to tap OK without reading, which is the opposite of
+  a safeguard. `window.rotulus.snackbar(text, onUndo, onCommit)` in
+  `rotulus-shared.js` replaces it on all three deletes.
+- **The delete is persisted immediately and undo persists the restore**, so memory
+  and storage never disagree even if you navigate away mid-countdown. Undo also
+  clears the tombstone.
+- Only one snackbar at a time — opening a second commits the first, so rapid
+  deletes cannot leave two pending undos racing.
+- Every call site is **guarded** (`if (window.rotulus && window.rotulus.snackbar)`)
+  because the test harnesses run page scripts without `rotulus-shared.js`.
+- **Offline:** a page opts in with `<span class="offline-pill">` next to its sync
+  note; the shared script toggles it on `online`/`offline` and re-runs whatever
+  `window.rotulus.onReconnect(fn)` was given.
+- Sync notes are `role="status" aria-live="polite"` — nothing announced "Sync
+  failed" before. The Pomodoro countdown is `role="timer"` + `aria-live="polite"`;
+  **polite, not assertive**, or a screen reader would interrupt itself every
+  second.
+- **Pinch-zoom stays disabled** (`maximum-scale=1, user-scalable=no`). This was
+  raised as an accessibility problem and the user explicitly chose to keep it.
+  Do not "fix" it.
+
 ## Design system (added in the Rotulus redesign)
 
 - **`css/rotulus.css`** — all shared tokens (colors, radii, shadows, motion,
   fonts) and shared components (nav, dropdowns, header, auth card, buttons,
   pills, card/background layer, animations, reduced-motion). Linked from
-  every page as `<link rel="stylesheet" href="/css/rotulus.css?v=2">`.
+  every page as `<link rel="stylesheet" href="/css/rotulus.css?v=7">`.
   Page-specific CSS (timer digits, calendar grid, goal cards, etc.) stays
   inline in each page's own `<style>` block.
 - **`js/rotulus-shared.js`** — theme apply/toggle, the gear dropdown, and the
@@ -241,8 +355,16 @@ and a `.flash-highlight` pulse on the timer card.
   accents on the home tracker: wake=orange, morning=sky, afternoon=purple,
   evening=green, before-bed=pink.
 - **Type:** `--font-display` (Baloo 2, headings/numbers), `--font-body`
-  (Nunito, everything else), loaded via Google Fonts with `display=swap`
-  and a `ui-rounded` fallback for offline iOS PWA use.
+  (Nunito, everything else). **Self-hosted since 2026-09-02** as two variable
+  woff2 files in `assets/fonts/`, declared `@font-face` at the top of
+  `rotulus.css` with `font-display: swap`. They used to come from a
+  render-blocking `<link>` to `fonts.googleapis.com` in every page's `<head>` —
+  precisely what the Navigation section says not to do, since that stretched the
+  frozen gap on every tab switch with a DNS lookup and TLS handshake before
+  anything could paint. One file per family covers every weight; the latin subset
+  starts at `U+0000-00FF`, so Norwegian æ/ø/å are included. The app now also
+  renders in its own fonts offline. `/assets/*` is immutable for a year, so
+  **replacing a font file needs a new filename.** The `ui-rounded` fallback stays.
 - **Motion:** transform/opacity-only transitions (`--t-fast`/`--t-med` +
   `--ease`), `:active { transform: scale(0.96) }` press feedback on all
   buttons, `@media (prefers-reduced-motion: reduce)` kills everything.
@@ -402,6 +524,15 @@ Don't reintroduce that pattern on a new page.
   `scrollswap_todo_state` and it renders.
 
 ## Habit tracker (`index.html`) specifics
+
+- **A checked slot glows in its own accent.** `.slot.checked` sets
+  `border-color` and a two-layer `box-shadow` from `--slot-accent` — the same
+  token `.slot-time` uses for its text, so the glow always matches the words above
+  it. It mirrors the Pomodoro timer card, which gets its look from
+  `filter: drop-shadow(0 0 4px var(--ring-color))` on the progress ring's 2.5px
+  stroke. `box-shadow` and `border-color` had to be added to `.slot`'s transition,
+  which only listed `transform` and `opacity`. Slot styles are inline in
+  `index.html`, so this needed no `?v=` bump on its own.
 
 - Slots start with **no real text** until the user writes their own via the
   "edit text" button. Until then each shows a greyed-out italic placeholder

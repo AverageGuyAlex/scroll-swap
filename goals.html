@@ -16,13 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=6">
+<link rel="stylesheet" href="/css/rotulus.css?v=7">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=6"></script>
+<script defer src="/js/rotulus-shared.js?v=7"></script>
 
 <style>
   /* Page-specific: goals */
@@ -168,7 +165,7 @@
     <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
     <p class="eyebrow">Long-term</p>
     <h1 class="title">Goals</h1>
-    <p class="subtitle">Set a deadline, track milestones, log your hours.</p>
+    <p class="subtitle">Set a deadline, link your to-do lists, log your hours.</p>
   </div>
 
   <div class="auth-card" id="authCard">
@@ -178,7 +175,8 @@
   <div id="addGoalArea"></div>
   <div id="goalsList"></div>
 
-  <p class="sync-note" id="syncNote"></p>
+  <p class="sync-note" id="syncNote" role="status" aria-live="polite"></p>
+  <span class="offline-pill">Offline &mdash; saved on this device</span>
 </div>
 
 <script>
@@ -192,7 +190,7 @@
   let state = { goals: [] };
   let addingGoal = false;
   let editingDueDateFor = null; // goal id
-  let addingMilestoneFor = null; // goal id
+  let linkingFor = null;         // goal id whose category picker is open
   let hoursFormDraft = {}; // goalId -> { date, hours } currently in the input fields
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -231,6 +229,73 @@
      this before uploading: pushing after a failed download would overwrite the
      server copy with whatever this device happens to hold, which may be nothing
      (e.g. a brand new browser, or a fresh domain — localStorage is per-domain). */
+  /* ---- Merge -------------------------------------------------------------
+     This page used to do "state = { goals: serverState.goals }" on every pull —
+     a wholesale replace, so whichever device wrote last silently erased the
+     other's goals. Same fix as todo.html: union by id, updatedAt settles a
+     conflict, tombstones stop a delete being undone by the other copy.
+
+     dailyHours is merged key by key rather than taken from the winner, because
+     hours logged on two devices on different days are both real. */
+  const TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+  function stamp(obj) {
+    if (obj && typeof obj === 'object') obj.updatedAt = Date.now();
+    return obj;
+  }
+
+  // Absent before this shipped, so a legacy goal always loses to a stamped edit.
+  function stampOf(obj) {
+    return obj && typeof obj.updatedAt === 'number' ? obj.updatedAt : 0;
+  }
+
+  function pruneTombstones(map) {
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+    Object.keys(map).forEach(function (id) {
+      if (typeof map[id] !== 'number' || map[id] < cutoff) delete map[id];
+    });
+    return map;
+  }
+
+  function markDeleted(id) {
+    if (!state.deletedIds || typeof state.deletedIds !== 'object') state.deletedIds = {};
+    state.deletedIds[id] = Date.now();
+  }
+
+  function mergeStates(mine, theirs) {
+    mine = mine || {}; theirs = theirs || {};
+    const deaths = pruneTombstones(Object.assign(
+      {},
+      (theirs.deletedIds && typeof theirs.deletedIds === 'object') ? theirs.deletedIds : {},
+      (mine.deletedIds && typeof mine.deletedIds === 'object') ? mine.deletedIds : {}
+    ));
+    const byId = {};
+    const order = [];
+    function take(goal) {
+      if (!goal || !goal.id) return;
+      const dead = deaths[goal.id];
+      // A tombstone beats a surviving copy unless that copy was edited after the
+      // delete, so re-creating a goal still wins over a stale deletion.
+      if (typeof dead === 'number' && stampOf(goal) <= dead) return;
+      const existing = byId[goal.id];
+      if (!existing) { byId[goal.id] = Object.assign({}, goal); order.push(goal.id); return; }
+      const winner = stampOf(goal) > stampOf(existing) ? goal : existing;
+      const loser = winner === goal ? existing : goal;
+      const merged = Object.assign({}, winner);
+      merged.dailyHours = Object.assign({}, loser.dailyHours || {}, winner.dailyHours || {});
+      // Links are additive; losing one silently would be worse than keeping both.
+      const links = (winner.linkedCategoryIds || []).slice();
+      (loser.linkedCategoryIds || []).forEach(function (id) {
+        if (links.indexOf(id) === -1) links.push(id);
+      });
+      merged.linkedCategoryIds = links;
+      byId[goal.id] = merged;
+    }
+    (Array.isArray(mine.goals) ? mine.goals : []).forEach(take);
+    (Array.isArray(theirs.goals) ? theirs.goals : []).forEach(take);
+    return { goals: order.map(function (id) { return byId[id]; }), deletedIds: deaths };
+  }
+
   async function pullFromServer() {
     if (!currentUser) return false;
     try {
@@ -239,7 +304,7 @@
       if (!res.ok) { syncFailed = true; return false; }
       const serverState = await res.json();
       if (serverState && serverState.goals) {
-        state = { goals: serverState.goals };
+        state = mergeStates(state, serverState);
         saveLocal();
       }
       syncFailed = false;
@@ -289,55 +354,98 @@
   // ---- Mutations ----
 
   async function addGoal(name, dueDate) {
-    state.goals.push({
+    state.goals.push(stamp({
       id: uid(), name, dueDate: dueDate || null, createdDate: todayKey(),
-      completed: false, milestones: [], dailyHours: {},
-    });
+      completed: false, milestones: [], linkedCategoryIds: [], dailyHours: {},
+    }));
     await persist();
   }
 
+  /* Same pattern as To-Do: delete immediately, offer it back for a few seconds.
+     A goal carries its whole logged-hours history, so this is the delete in the
+     app most worth being able to take back. */
   async function deleteGoal(goalId) {
-    if (!confirm('Delete this goal and all its progress?')) return;
-    state.goals = state.goals.filter(g => g.id !== goalId);
+    const idx = state.goals.findIndex(g => g.id === goalId);
+    if (idx === -1) return;
+    const removed = state.goals[idx];
+    markDeleted(goalId);
+    state.goals.splice(idx, 1);
     await persist();
     renderGoals();
+    if (window.rotulus && window.rotulus.snackbar) {
+      window.rotulus.snackbar('Deleted "' + removed.name + '"', async () => {
+        if (state.deletedIds) delete state.deletedIds[goalId];
+        state.goals.splice(idx, 0, removed);
+        await persist();
+        renderGoals();
+      });
+    }
   }
 
   async function updateGoalDueDate(goalId, dueDate) {
     const goal = state.goals.find(g => g.id === goalId);
-    if (goal) goal.dueDate = dueDate || null;
+    if (goal) stamp(goal).dueDate = dueDate || null;
     await persist();
   }
 
   function toggleGoalCompleted(goalId) {
     const goal = state.goals.find(g => g.id === goalId);
-    if (goal) goal.completed = !goal.completed;
+    if (goal) stamp(goal).completed = !goal.completed;
     // Update the UI immediately; the save/sync runs in the background.
     renderGoals();
     persist();
   }
 
-  async function addMilestone(goalId, text) {
+  /* ---- Linked To-Do categories -----------------------------------------
+     Milestones were free text you had to tick a second time, in a second place.
+     A goal now points at the To-Do categories that actually move it forward, and
+     the tick comes from the tasks themselves.
+
+     The To-Do state is read straight out of localStorage, the way dashboard.html
+     already reads other pages' keys — no second sync, no server work. Progress is
+     DERIVED on every render and never stored, so it cannot drift out of step with
+     the real task list.
+
+     The stored milestones array is deliberately left alone rather than deleted:
+     nothing is thrown away, so this is reversible. */
+  const TODO_STATE_KEY = 'scrollswap_todo_state';
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function loadTodoCategories() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(TODO_STATE_KEY) || '{}');
+      return Array.isArray(raw.categories) ? raw.categories : [];
+    } catch (e) { return []; }
+  }
+
+  function categoryProgress(cat) {
+    let done = 0, total = 0;
+    (cat.subcategories || []).forEach(sc => {
+      (sc.tasks || []).forEach(t => { total++; if (t.done) done++; });
+    });
+    return { done, total, complete: total > 0 && done === total };
+  }
+
+  async function linkCategory(goalId, catId) {
     const goal = state.goals.find(g => g.id === goalId);
-    if (goal) goal.milestones.push({ id: uid(), text, done: false, completedDate: null });
+    if (!goal) return;
+    if (!Array.isArray(goal.linkedCategoryIds)) goal.linkedCategoryIds = [];
+    if (goal.linkedCategoryIds.indexOf(catId) === -1) goal.linkedCategoryIds.push(catId);
+    stamp(goal);
     await persist();
-  }
-
-  function toggleMilestone(goalId, milestoneId) {
-    const goal = state.goals.find(g => g.id === goalId);
-    const m = goal && goal.milestones.find(x => x.id === milestoneId);
-    if (m) {
-      m.done = !m.done;
-      m.completedDate = m.done ? todayKey() : null;
-    }
-    // Update the UI immediately; the save/sync runs in the background.
     renderGoals();
-    persist();
   }
 
-  async function deleteMilestone(goalId, milestoneId) {
+  async function unlinkCategory(goalId, catId) {
     const goal = state.goals.find(g => g.id === goalId);
-    if (goal) goal.milestones = goal.milestones.filter(m => m.id !== milestoneId);
+    if (!goal || !Array.isArray(goal.linkedCategoryIds)) return;
+    goal.linkedCategoryIds = goal.linkedCategoryIds.filter(id => id !== catId);
+    stamp(goal);
     await persist();
     renderGoals();
   }
@@ -347,6 +455,7 @@
     if (!goal) return;
     const num = parseFloat(hours);
     if (!date || isNaN(num) || num < 0) return;
+    stamp(goal);
     if (num === 0) delete goal.dailyHours[date];
     else goal.dailyHours[date] = num;
     await persist();
@@ -402,7 +511,7 @@
     area.innerHTML = `
       <div class="inline-form">
         <p class="field-label">Goal name</p>
-        <input type="text" class="inline-input" id="newGoalName" placeholder="e.g. Run a half marathon">
+        <input type="text" maxlength="80" class="inline-input" id="newGoalName" placeholder="e.g. Run a half marathon">
         <p class="field-label">Due date</p>
         <input type="date" class="inline-input" id="newGoalDueDate">
         <div class="inline-row">
@@ -434,6 +543,56 @@
     }
     list.innerHTML = state.goals.map(g => renderGoalCard(g)).join('');
     attachGoalListeners();
+  }
+
+  /* Reuses the milestone row styles rather than inventing new ones — the shape
+     of the row is unchanged, only where its tick comes from. */
+  function renderLinkedCategories(goal) {
+    const linked = Array.isArray(goal.linkedCategoryIds) ? goal.linkedCategoryIds : [];
+    if (!linked.length) {
+      return '<p class="empty-note" style="margin:4px 0 8px;">No lists linked yet.</p>';
+    }
+    const cats = loadTodoCategories();
+    return linked.map(catId => {
+      const cat = cats.find(c => c.id === catId);
+      if (!cat) {
+        // Deleted in To-Do since it was linked. Say so plainly and offer a way out
+        // rather than vanishing silently or throwing on a missing object.
+        return `
+          <div class="milestone-row">
+            <div class="milestone-box"></div>
+            <span class="milestone-text" style="color:var(--ink-dim); font-style:italic;">Category removed</span>
+            <button class="icon-btn unlink-btn" data-goal-id="${goal.id}" data-cat-id="${catId}">&times;</button>
+          </div>`;
+      }
+      const p = categoryProgress(cat);
+      return `
+        <div class="milestone-row">
+          <div class="milestone-box ${p.complete ? 'checked' : ''}">${checkmarkSVG()}</div>
+          <span class="milestone-text ${p.complete ? 'checked' : ''}">${escapeHtml(cat.name)}</span>
+          ${p.total > 0 ? `<span class="milestone-date">${p.done}/${p.total}</span>` : '<span class="milestone-date">empty</span>'}
+          <button class="icon-btn unlink-btn" data-goal-id="${goal.id}" data-cat-id="${cat.id}">&times;</button>
+        </div>`;
+    }).join('');
+  }
+
+  function renderCategoryPicker(goal) {
+    const linked = Array.isArray(goal.linkedCategoryIds) ? goal.linkedCategoryIds : [];
+    const available = loadTodoCategories().filter(c => linked.indexOf(c.id) === -1);
+    if (!available.length) {
+      return `
+        <div class="inline-form" style="margin-top:8px;">
+          <p class="empty-note" style="margin:0;">${loadTodoCategories().length ? 'Every category is already linked.' : 'No categories on your To-Do page yet.'}</p>
+          <button class="inline-btn cancel cancel-link-btn" data-goal-id="${goal.id}">Close</button>
+        </div>`;
+    }
+    return `
+      <div class="inline-form" style="margin-top:8px;">
+        ${available.map(c => `
+          <button class="add-row-btn pick-cat-btn" data-goal-id="${goal.id}" data-cat-id="${c.id}"
+                  style="text-align:left;">${escapeHtml(c.name)}</button>`).join('')}
+        <button class="inline-btn cancel cancel-link-btn" data-goal-id="${goal.id}">Cancel</button>
+      </div>`;
   }
 
   function renderGoalCard(goal) {
@@ -476,24 +635,11 @@
           ${goal.completed ? '&#10003; Completed' : 'Mark as complete'}
         </button>
 
-        <p class="goal-section-title">Milestones</p>
-        ${goal.milestones.map(m => `
-          <div class="milestone-row">
-            <div class="milestone-box ${m.done ? 'checked' : ''}" data-goal-id="${goal.id}" data-milestone-id="${m.id}">${checkmarkSVG()}</div>
-            <span class="milestone-text ${m.done ? 'checked' : ''}" data-goal-id="${goal.id}" data-milestone-id="${m.id}">${m.text}</span>
-            ${m.done && m.completedDate ? `<span class="milestone-date">${formatShortDate(m.completedDate)}</span>` : ''}
-            <button class="icon-btn delete-milestone-btn" data-goal-id="${goal.id}" data-milestone-id="${m.id}">&times;</button>
-          </div>
-        `).join('')}
-        ${addingMilestoneFor === goal.id ? `
-          <div class="inline-form" style="margin-top:8px;">
-            <input type="text" class="inline-input new-milestone-text" data-goal-id="${goal.id}" placeholder="Milestone (e.g. Run 10k without stopping)">
-            <div class="inline-row">
-              <button class="inline-btn cancel cancel-milestone-btn" data-goal-id="${goal.id}">Cancel</button>
-              <button class="inline-btn confirm confirm-milestone-btn" data-goal-id="${goal.id}">Add</button>
-            </div>
-          </div>
-        ` : `<button class="add-row-btn add-milestone-trigger" data-goal-id="${goal.id}">+ Add milestone</button>`}
+        <p class="goal-section-title">To-do lists</p>
+        ${renderLinkedCategories(goal)}
+        ${linkingFor === goal.id
+          ? renderCategoryPicker(goal)
+          : `<button class="add-row-btn add-link-trigger" data-goal-id="${goal.id}">+ Link a to-do category</button>`}
 
         <p class="goal-section-title">Hours worked</p>
         <div class="hours-total-row">
@@ -549,28 +695,20 @@
       btn.addEventListener('click', () => toggleGoalCompleted(btn.dataset.goalId));
     });
 
-    document.querySelectorAll('.milestone-box, .milestone-text').forEach(el => {
-      el.addEventListener('click', () => toggleMilestone(el.dataset.goalId, el.dataset.milestoneId));
+    document.querySelectorAll('.add-link-trigger').forEach(btn => {
+      btn.addEventListener('click', () => { linkingFor = btn.dataset.goalId; renderGoals(); });
     });
-    document.querySelectorAll('.delete-milestone-btn').forEach(btn => {
-      btn.addEventListener('click', () => deleteMilestone(btn.dataset.goalId, btn.dataset.milestoneId));
+    document.querySelectorAll('.cancel-link-btn').forEach(btn => {
+      btn.addEventListener('click', () => { linkingFor = null; renderGoals(); });
     });
-
-    document.querySelectorAll('.add-milestone-trigger').forEach(btn => {
-      btn.addEventListener('click', () => { addingMilestoneFor = btn.dataset.goalId; renderGoals(); });
-    });
-    document.querySelectorAll('.cancel-milestone-btn').forEach(btn => {
-      btn.addEventListener('click', () => { addingMilestoneFor = null; renderGoals(); });
-    });
-    document.querySelectorAll('.confirm-milestone-btn').forEach(btn => {
+    document.querySelectorAll('.pick-cat-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const input = document.querySelector(`.new-milestone-text[data-goal-id="${btn.dataset.goalId}"]`);
-        const text = input.value.trim();
-        if (!text) return;
-        await addMilestone(btn.dataset.goalId, text);
-        addingMilestoneFor = null;
-        renderGoals();
+        linkingFor = null;
+        await linkCategory(btn.dataset.goalId, btn.dataset.catId);
       });
+    });
+    document.querySelectorAll('.unlink-btn').forEach(btn => {
+      btn.addEventListener('click', () => unlinkCategory(btn.dataset.goalId, btn.dataset.catId));
     });
 
     document.querySelectorAll('.save-hours-btn').forEach(btn => {

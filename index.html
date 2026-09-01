@@ -16,13 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=6">
+<link rel="stylesheet" href="/css/rotulus.css?v=7">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=6"></script>
+<script defer src="/js/rotulus-shared.js?v=7"></script>
 
 <style>
   /* Page-specific: habit tracker */
@@ -103,9 +100,20 @@
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-card);
     cursor: pointer;
-    transition: transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
+    transition: transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease),
+                box-shadow var(--t-med) var(--ease), border-color var(--t-med) var(--ease);
   }
   .slot:active { transform: scale(0.985); }
+
+  /* A checked slot picks up the same glowing outline the Pomodoro timer card
+     gets from its progress ring — there it is a drop-shadow on a 2.5px stroke,
+     here the equivalent as a box-shadow. The colour is --slot-accent, the very
+     token .slot-time uses for its text, so the glow always matches the words
+     above it. Reduced motion collapses the transition and it simply appears. */
+  .slot.checked {
+    border-color: var(--slot-accent);
+    box-shadow: 0 0 0 1px var(--slot-accent), 0 0 14px -3px var(--slot-accent), var(--shadow-card);
+  }
   .slot[data-id="wake"]       { --slot-accent: var(--acc-orange); --slot-soft: var(--acc-orange-soft); }
   .slot[data-id="morning"]    { --slot-accent: var(--acc-sky);    --slot-soft: var(--acc-sky-soft); }
   .slot[data-id="between"]    { --slot-accent: var(--acc-purple); --slot-soft: var(--acc-purple-soft); }
@@ -583,7 +591,8 @@
           </div>
           <div class="today-reset">Resets at<br>${formatResetHourLabel(getResetHour())}</div>
         </div>
-        <p class="sync-note" id="syncNote"></p>
+        <p class="sync-note" id="syncNote" role="status" aria-live="polite"></p>
+        <span class="offline-pill">Offline &mdash; saved on this device</span>
       </div>
       <div style="display:flex; gap:10px; margin-top:14px;">
         <button class="reset-link" id="resetBtn" style="flex:1;">clear today</button>
@@ -639,8 +648,8 @@
       <div class="slots">
         ${slots.map(s => `
           <div class="edit-slot">
-            <input type="text" class="edit-input edit-time-input" data-id="${s.id}" value="${s.time.replace(/"/g, '&quot;')}">
-            <textarea class="edit-input edit-swap-input" data-id="${s.id}" rows="2" style="resize:vertical;" placeholder="${s.placeholder.replace(/"/g, '&quot;')}">${s.swap}</textarea>
+            <input type="text" maxlength="40" class="edit-input edit-time-input" data-id="${s.id}" value="${s.time.replace(/"/g, '&quot;')}">
+            <textarea maxlength="200" class="edit-input edit-swap-input" data-id="${s.id}" rows="2" style="resize:vertical;" placeholder="${s.placeholder.replace(/"/g, '&quot;')}">${s.swap}</textarea>
           </div>
         `).join('')}
       </div>

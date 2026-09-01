@@ -16,13 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/rotulus.css?v=6">
+<link rel="stylesheet" href="/css/rotulus.css?v=7">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=6"></script>
+<script defer src="/js/rotulus-shared.js?v=7"></script>
 
 <style>
   /* Page-specific: to-do */
@@ -65,6 +62,68 @@
   }
   .color-swatch-input::-webkit-color-swatch-wrapper { padding: 0; }
   .color-swatch-input::-webkit-color-swatch { border: 1px solid var(--line); border-radius: var(--r-sm); }
+
+  /* Colour groups --------------------------------------------------------
+     Six fixed colours, and the colour IS the group. Each is a collapsible
+     section, so a long list folds down to a handful of headers. */
+  .group-section { margin-bottom: 16px; }
+  .group-header {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; margin-bottom: 8px;
+    background: transparent; border: none; border-left: 4px solid var(--group-color);
+    border-radius: var(--r-sm); cursor: pointer; text-align: left;
+    font-family: var(--font-body);
+    transition: transform var(--t-fast) var(--ease);
+  }
+  .group-header:active { transform: scale(0.99); }
+  .group-name {
+    font-weight: 800; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--group-color); flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .group-count {
+    font-weight: 800; font-size: 10.5px; color: var(--ink-dim);
+    border: 1px solid var(--line); border-radius: var(--r-pill); padding: 2px 7px; flex-shrink: 0;
+  }
+  .group-chevron {
+    flex-shrink: 0; color: var(--ink-dim); font-size: 11px;
+    transition: transform var(--t-fast) var(--ease);
+  }
+  .group-section.collapsed .group-chevron { transform: rotate(-90deg); }
+  .group-section.collapsed .group-body { display: none; }
+  .group-rename-btn {
+    flex-shrink: 0; background: transparent; border: none; cursor: pointer;
+    color: var(--ink-dim); font-size: 12px; padding: 2px 5px;
+  }
+  .group-rename-row { display: flex; gap: 6px; margin-bottom: 10px; }
+
+  /* Fixed palette, replacing the free colour input that let every category be
+     its own shade — that unbounded palette was the clutter. */
+  .palette-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .palette-dot {
+    width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+    border: none; background: var(--dot-color);
+    padding: 0; flex-shrink: 0;
+    transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+  }
+  .palette-dot.selected { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--dot-color); }
+  .palette-dot:active { transform: scale(0.9); }
+  .group-swatch {
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+    border: none; padding: 0; cursor: pointer; background: var(--group-color);
+  }
+  .group-editor { padding: 4px 2px 10px; }
+
+  /* Sort bar */
+  .sort-row { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 2px; }
+  .sort-btn {
+    flex-shrink: 0; font-family: var(--font-body); font-weight: 700; font-size: 11.5px;
+    padding: 6px 11px; border-radius: var(--r-pill); cursor: pointer;
+    background: transparent; color: var(--ink-dim); border: 1px solid var(--line);
+    transition: transform var(--t-fast) var(--ease);
+  }
+  .sort-btn:active { transform: scale(0.96); }
+  .sort-btn.selected { background: var(--primary); color: #FFFFFF; border-color: var(--primary); }
 
   /* Category card */
   .cat-card {
@@ -198,6 +257,7 @@
     <p class="auth-status">Checking login&hellip;</p>
   </div>
 
+  <div class="sort-row" id="sortRow"></div>
   <div id="addCatArea"></div>
   <div id="categoriesList"></div>
 
@@ -206,7 +266,8 @@
   </div>
   <div class="archive-panel" id="archivePanel"></div>
 
-  <p class="sync-note" id="syncNote"></p>
+  <p class="sync-note" id="syncNote" role="status" aria-live="polite"></p>
+  <span class="offline-pill">Offline &mdash; saved on this device</span>
 </div>
 
 <script>
@@ -228,10 +289,124 @@
   let addingSubcatFor = null; // category id
   let addingTaskFor = null;   // { categoryId, subcatId }
   let editingDueDateFor = null; // category id
+  let editingGroupFor = null;   // category id whose colour-group palette is open
+  let renamingGroup = null;     // group id being renamed
   let editingTaskDueFor = null; // { catId, subcatId, taskId }
   let expandedSubcats = new Set(); // subcategory ids currently expanded
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  // Names are user-entered and were being interpolated into markup raw.
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ---- Colour groups ----------------------------------------------------
+     The colour IS the group: a category carries a group id, not a hex string,
+     so its swatch follows the light/dark palette instead of freezing whatever
+     shade was picked. Six is deliberate — the old free colour input let every
+     category be its own colour, which is what made the list unreadable. */
+  const GROUPS = [
+    { id: 'purple', label: 'Purple', ref: '#9B6CF0' },
+    { id: 'sky',    label: 'Sky',    ref: '#4FA3F7' },
+    { id: 'green',  label: 'Green',  ref: '#3EBE7E' },
+    { id: 'orange', label: 'Orange', ref: '#F59E42' },
+    { id: 'pink',   label: 'Pink',   ref: '#F272B0' },
+    { id: 'red',    label: 'Red',    ref: '#F26D6D' },
+  ];
+  const DEFAULT_GROUP = 'purple';
+
+  function groupColorVar(groupId) { return 'var(--acc-' + groupId + ')'; }
+
+  function catGroup(cat) {
+    return GROUPS.some(function (g) { return g.id === (cat && cat.group); }) ? cat.group : DEFAULT_GROUP;
+  }
+
+  function groupLabel(groupId) {
+    const custom = state.groupNames && state.groupNames[groupId];
+    if (custom && String(custom).trim()) return String(custom).trim();
+    const g = GROUPS.find(function (x) { return x.id === groupId; });
+    return g ? g.label : groupId;
+  }
+
+  /* Categories saved before groups existed hold an arbitrary hex. Snap each to
+     the nearest palette colour once, by plain RGB distance — approximate is
+     fine, the point is only that similar shades land in the same group. */
+  function nearestGroup(hex) {
+    if (typeof hex !== 'string') return DEFAULT_GROUP;
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) return DEFAULT_GROUP;
+    const v = parseInt(m[1], 16);
+    const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+    let best = DEFAULT_GROUP, bestDist = Infinity;
+    GROUPS.forEach(function (grp) {
+      const rv = parseInt(grp.ref.slice(1), 16);
+      const dr = ((rv >> 16) & 255) - r, dg = ((rv >> 8) & 255) - g, db = (rv & 255) - b;
+      const dist = dr * dr + dg * dg + db * db;
+      if (dist < bestDist) { bestDist = dist; best = grp.id; }
+    });
+    return best;
+  }
+
+  /* uid() is Date.now().toString(36) plus five random characters, so a category
+     saved before createdAt existed still knows roughly when it was made. New
+     ones carry createdAt outright; this is only the fallback for the old ones. */
+  function categoryCreatedAt(cat) {
+    if (typeof cat.createdAt === 'number') return cat.createdAt;
+    const parsed = parseInt(String(cat.id || '').slice(0, -5), 36);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  const SORT_KEY = 'scrollswap_todo_sort';
+  const COLLAPSED_KEY = 'scrollswap_todo_collapsed_groups';
+  const SORTS = [
+    { id: 'due', label: 'Due date' },
+    { id: 'unfinished', label: 'Unfinished first' },
+    { id: 'name', label: 'A-Z' },
+    { id: 'newest', label: 'Newest' },
+  ];
+
+  let currentSort = 'due';
+  let collapsedGroups = [];
+
+  function loadSort() {
+    try {
+      const v = localStorage.getItem(SORT_KEY);
+      return SORTS.some(function (x) { return x.id === v; }) ? v : 'due';
+    } catch (e) { return 'due'; }
+  }
+  function saveSort(v) { try { localStorage.setItem(SORT_KEY, v); } catch (e) {} }
+
+  function loadCollapsed() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) { return []; }
+  }
+  function saveCollapsed(list) {
+    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  function sortCategories(cats) {
+    const list = [...cats];
+    if (currentSort === 'name') {
+      list.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+    } else if (currentSort === 'newest') {
+      list.sort(function (a, b) { return categoryCreatedAt(b) - categoryCreatedAt(a); });
+    } else if (currentSort === 'unfinished') {
+      list.sort(function (a, b) { return (isCatComplete(a) ? 1 : 0) - (isCatComplete(b) ? 1 : 0); });
+    } else {
+      // Overdue and soonest first; undated last rather than pretending to be urgent.
+      list.sort(function (a, b) {
+        const ad = a.dueDate || '9999-99-99';
+        const bd = b.dueDate || '9999-99-99';
+        return ad < bd ? -1 : ad > bd ? 1 : 0;
+      });
+    }
+    return list;
+  }
 
   function todayKey() {
     const d = new Date();
@@ -247,6 +422,21 @@
       if (!state.categories) state.categories = [];
       if (!state.completions) state.completions = {};
     } catch (e) { state = { categories: [], completions: {} }; }
+    migrateColorsToGroups();
+  }
+
+  /* Runs on every load, but only writes when something actually changed, so a
+     migrated device does not re-save (and re-sync) an identical blob forever. */
+  function migrateColorsToGroups() {
+    if (!state || !Array.isArray(state.categories)) return;
+    if (!state.groupNames || typeof state.groupNames !== 'object') state.groupNames = {};
+    let changed = false;
+    state.categories.forEach(function (cat) {
+      if (!cat) return;
+      const valid = GROUPS.some(function (g) { return g.id === cat.group; });
+      if (!valid) { cat.group = nearestGroup(cat.color); changed = true; }
+    });
+    if (changed) { try { saveLocal(); } catch (e) {} }
   }
 
   function saveLocal() {
@@ -263,6 +453,102 @@
      this before uploading: pushing after a failed download would overwrite the
      server copy with whatever this device happens to hold, which may be nothing
      (e.g. a brand new browser, or a fresh domain — localStorage is per-domain). */
+  /* ---- Merge -------------------------------------------------------------
+     This page used to do "state = serverState; saveLocal()" on every pull — a
+     wholesale replace, so whichever device wrote last won and the other one's
+     work vanished with no error at all. It bit on any divergence: aeroplane
+     mode, a dead signal, or simply phone-then-laptop.
+
+     The merge is by item id (uid() has always produced stable ones), with an
+     updatedAt stamp deciding conflicts and tombstones so a delete is not
+     resurrected by the other device's still-present copy.
+
+     Habits, Pomodoro and Diary need none of this: they store one key per day,
+     so a pull only ever adds days and they heal on their own. */
+  const TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+  function stamp(obj) {
+    if (obj && typeof obj === 'object') obj.updatedAt = Date.now();
+    return obj;
+  }
+
+  // Absent on anything saved before this shipped, so an unstamped item always
+  // loses to a stamped edit rather than winning by accident.
+  function stampOf(obj) {
+    return obj && typeof obj.updatedAt === 'number' ? obj.updatedAt : 0;
+  }
+
+  function tombstonesOf(st) {
+    return (st && st.deletedIds && typeof st.deletedIds === 'object') ? st.deletedIds : {};
+  }
+
+  // Without pruning this grows forever; 90 days is far longer than any device
+  // realistically stays offline, and every copy has synced by then.
+  function pruneTombstones(map) {
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+    Object.keys(map).forEach(function (id) {
+      if (typeof map[id] !== 'number' || map[id] < cutoff) delete map[id];
+    });
+    return map;
+  }
+
+  function markDeleted(id) {
+    if (!state.deletedIds || typeof state.deletedIds !== 'object') state.deletedIds = {};
+    state.deletedIds[id] = Date.now();
+  }
+
+  /* Union by id at each level. A tombstone beats a copy that still exists,
+     unless that copy was edited after the delete was recorded — so re-adding
+     something on one device still survives a stale delete from the other. */
+  function mergeLists(mine, theirs, deaths, childKey) {
+    const byId = {};
+    const order = [];
+    function take(item) {
+      if (!item || !item.id) return;
+      const dead = deaths[item.id];
+      if (typeof dead === 'number' && stampOf(item) <= dead) return;
+      const existing = byId[item.id];
+      if (!existing) {
+        byId[item.id] = Object.assign({}, item);
+        order.push(item.id);
+        return;
+      }
+      const winner = stampOf(item) > stampOf(existing) ? item : existing;
+      const loser = winner === item ? existing : item;
+      const merged = Object.assign({}, winner);
+      // Children merge on their own regardless of which parent won, or editing a
+      // category name on one device would drop the other's new tasks with it.
+      if (childKey) {
+        merged[childKey] = mergeLists(
+          Array.isArray(winner[childKey]) ? winner[childKey] : [],
+          Array.isArray(loser[childKey]) ? loser[childKey] : [],
+          deaths,
+          childKey === 'subcategories' ? 'tasks' : null
+        );
+      }
+      byId[item.id] = merged;
+    }
+    (Array.isArray(mine) ? mine : []).forEach(take);
+    (Array.isArray(theirs) ? theirs : []).forEach(take);
+    return order.map(function (id) { return byId[id]; });
+  }
+
+  function mergeStates(mine, theirs) {
+    mine = mine || {}; theirs = theirs || {};
+    const deaths = pruneTombstones(
+      Object.assign({}, tombstonesOf(theirs), tombstonesOf(mine))
+    );
+    return {
+      categories: mergeLists(mine.categories, theirs.categories, deaths, 'subcategories'),
+      // Completions are per-day records, like the pages that never had this bug,
+      // so a union is right; this device wins a same-day tie because it is the
+      // one being looked at.
+      completions: Object.assign({}, theirs.completions || {}, mine.completions || {}),
+      groupNames: Object.assign({}, theirs.groupNames || {}, mine.groupNames || {}),
+      deletedIds: deaths,
+    };
+  }
+
   async function pullFromServer() {
     if (!currentUser) return false;
     try {
@@ -271,10 +557,7 @@
       if (!res.ok) { syncFailed = true; return false; }
       const serverState = await res.json();
       if (serverState && (serverState.categories || serverState.completions)) {
-        state = {
-          categories: serverState.categories || [],
-          completions: serverState.completions || {},
-        };
+        state = mergeStates(state, serverState);
         saveLocal();
       }
       syncFailed = false;
@@ -337,6 +620,7 @@
       if (!state.completions[key]) state.completions[key] = {};
       state.completions[key][task.id] = !state.completions[key][task.id];
     } else {
+      stamp(task);
       task.done = !task.done;
       if (task.done) {
         task.completedDate = todayKey();
@@ -376,27 +660,48 @@
 
   // ---- Mutations ----
 
-  async function addCategory(name, color, dueDate) {
-    state.categories.push({ id: uid(), name, color, dueDate: dueDate || null, subcategories: [] });
+  let newCatGroup = DEFAULT_GROUP;
+
+  async function addCategory(name, group, dueDate) {
+    state.categories.push(stamp({
+      id: uid(), name, group: group || DEFAULT_GROUP, dueDate: dueDate || null,
+      createdAt: Date.now(), subcategories: [],
+    }));
     await persist();
   }
 
+  /* Deletes now happen straight away and offer themselves back for a few
+     seconds, rather than gating on a blocking confirm() you learn to dismiss
+     without reading. The delete is persisted immediately and undo persists the
+     restore, so storage and memory never disagree even if you navigate away
+     while the snackbar is still up. */
   async function deleteCategory(catId) {
-    if (!confirm('Delete this category and everything in it?')) return;
-    state.categories = state.categories.filter(c => c.id !== catId);
+    const idx = state.categories.findIndex(c => c.id === catId);
+    if (idx === -1) return;
+    const removed = state.categories[idx];
+    markDeleted(catId);
+    state.categories.splice(idx, 1);
     await persist();
     renderCategories();
+    if (window.rotulus && window.rotulus.snackbar) {
+      window.rotulus.snackbar('Deleted "' + removed.name + '"', async () => {
+        if (state.deletedIds) delete state.deletedIds[catId];
+        state.categories.splice(idx, 0, removed);
+        await persist();
+        renderCategories();
+      });
+    }
   }
 
-  async function updateCategoryColor(catId, color) {
+  async function updateCategoryGroup(catId, group) {
     const cat = state.categories.find(c => c.id === catId);
-    if (cat) cat.color = color;
+    if (cat && GROUPS.some(g => g.id === group)) stamp(cat).group = group;
     await persist();
   }
 
   async function updateCategoryDueDate(catId, dueDate) {
     const cat = state.categories.find(c => c.id === catId);
-    if (cat) cat.dueDate = dueDate || null;
+    if (cat) stamp(cat).dueDate = dueDate || null;
     await persist();
   }
 
@@ -409,23 +714,36 @@
   }
 
   async function deleteSubcategory(catId, subcatId) {
-    if (!confirm('Delete this subcategory and its tasks?')) return;
     const cat = state.categories.find(c => c.id === catId);
-    if (cat) cat.subcategories = cat.subcategories.filter(s => s.id !== subcatId);
+    if (!cat) return;
+    const idx = cat.subcategories.findIndex(s => s.id === subcatId);
+    if (idx === -1) return;
+    const removed = cat.subcategories[idx];
+    markDeleted(subcatId);
+    cat.subcategories.splice(idx, 1);
     await persist();
     renderCategories();
+    if (window.rotulus && window.rotulus.snackbar) {
+      window.rotulus.snackbar('Deleted "' + removed.name + '"', async () => {
+        if (state.deletedIds) delete state.deletedIds[subcatId];
+        cat.subcategories.splice(idx, 0, removed);
+        await persist();
+        renderCategories();
+      });
+    }
   }
 
   async function addTask(catId, subcatId, text, recurring, scheduledDate) {
     const cat = state.categories.find(c => c.id === catId);
     const subcat = cat && cat.subcategories.find(s => s.id === subcatId);
-    const task = { id: uid(), text, recurring, done: false };
+    const task = stamp({ id: uid(), text, recurring, done: false });
     if (!recurring && scheduledDate) task.scheduledDate = scheduledDate;
     if (subcat) subcat.tasks.push(task);
     await persist();
   }
 
   async function deleteTask(catId, subcatId, taskId) {
+    markDeleted(taskId);
     const cat = state.categories.find(c => c.id === catId);
     const subcat = cat && cat.subcategories.find(s => s.id === subcatId);
     if (subcat) subcat.tasks = subcat.tasks.filter(t => t.id !== taskId);
@@ -438,6 +756,7 @@
     const subcat = cat && cat.subcategories.find(s => s.id === subcatId);
     const task = subcat && subcat.tasks.find(t => t.id === taskId);
     if (task) {
+      stamp(task);
       if (dateStr) task.scheduledDate = dateStr;
       else delete task.scheduledDate;
     }
@@ -485,9 +804,10 @@
     }
     area.innerHTML = `
       <div class="inline-form">
-        <div class="inline-row">
-          <input type="color" class="color-swatch-input" id="newCatColor" value="#6C5CE7">
-          <input type="text" class="inline-input" id="newCatName" placeholder="Category name (e.g. School)" style="flex:1;">
+        <input type="text" class="inline-input" id="newCatName" placeholder="Category name (e.g. School)" maxlength="80">
+        <div class="palette-row" id="newCatPalette">
+          ${GROUPS.map(g => '<button class="palette-dot' + (g.id === newCatGroup ? ' selected' : '') +
+            '" data-group="' + g.id + '" style="--dot-color: ' + groupColorVar(g.id) + '" aria-label="' + escapeHtml(groupLabel(g.id)) + '"></button>').join('')}
         </div>
         <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; color:var(--ink-dim);">
           Due date (optional)
@@ -503,12 +823,19 @@
       addingCategory = false;
       renderAddCategoryArea();
     });
+    area.querySelectorAll('.palette-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        newCatGroup = dot.dataset.group;
+        area.querySelectorAll('.palette-dot').forEach(d => {
+          d.classList.toggle('selected', d.dataset.group === newCatGroup);
+        });
+      });
+    });
     document.getElementById('confirmCatBtn').addEventListener('click', async () => {
       const name = document.getElementById('newCatName').value.trim();
-      const color = document.getElementById('newCatColor').value;
       const dueDate = document.getElementById('newCatDueDate').value;
       if (!name) return;
-      await addCategory(name, color, dueDate);
+      await addCategory(name, newCatGroup, dueDate);
       addingCategory = false;
       renderAddCategoryArea();
       renderCategories();
@@ -536,8 +863,117 @@
       return;
     }
 
-    list.innerHTML = state.categories.map(cat => renderCategoryCard(cat)).join('');
+    // Only groups that actually hold something are drawn, so six headings never
+    // appear before they have been used.
+    list.innerHTML = GROUPS.map(g => {
+      const cats = sortCategories(state.categories.filter(c => catGroup(c) === g.id));
+      if (!cats.length) return '';
+      const collapsed = collapsedGroups.indexOf(g.id) !== -1;
+      return `
+        <div class="group-section ${collapsed ? 'collapsed' : ''}" data-group="${g.id}" style="--group-color: ${groupColorVar(g.id)}">
+          <div class="group-header" data-group="${g.id}" role="button" tabindex="0" aria-expanded="${collapsed ? 'false' : 'true'}">
+            <span class="group-chevron">&#9660;</span>
+            <span class="group-name">${escapeHtml(groupLabel(g.id))}</span>
+            <span class="group-count">${cats.length}</span>
+            <button class="group-rename-btn" data-rename-group="${g.id}" aria-label="Rename this group">&#9998;</button>
+          </div>
+          <div class="group-body">
+            ${renamingGroup === g.id ? renderGroupRename(g.id) : ''}
+            ${cats.map(cat => renderCategoryCard(cat)).join('')}
+          </div>
+        </div>`;
+    }).join('');
+
     attachCategoryListeners();
+    attachGroupListeners();
+  }
+
+  function renderGroupRename(groupId) {
+    return `
+      <div class="group-rename-row">
+        <input type="text" class="inline-input group-rename-input" maxlength="40" value="${escapeHtml(groupLabel(groupId))}" style="flex:1;">
+        <button class="inline-btn cancel group-rename-cancel">Cancel</button>
+        <button class="inline-btn confirm group-rename-save" data-group="${groupId}">Save</button>
+      </div>`;
+  }
+
+  function attachGroupListeners() {
+    document.querySelectorAll('.group-header').forEach(header => {
+      header.addEventListener('click', e => {
+        const rename = e.target.closest('[data-rename-group]');
+        if (rename) {
+          renamingGroup = rename.dataset.renameGroup;
+          renderCategories();
+          return;
+        }
+        const id = header.dataset.group;
+        const at = collapsedGroups.indexOf(id);
+        if (at === -1) collapsedGroups.push(id); else collapsedGroups.splice(at, 1);
+        saveCollapsed(collapsedGroups);
+        renderCategories();
+      });
+    });
+
+    const cancel = document.querySelector('.group-rename-cancel');
+    if (cancel) cancel.addEventListener('click', () => { renamingGroup = null; renderCategories(); });
+
+    const save = document.querySelector('.group-rename-save');
+    if (save) {
+      save.addEventListener('click', async () => {
+        const input = document.querySelector('.group-rename-input');
+        const value = input ? input.value.trim() : '';
+        if (!state.groupNames) state.groupNames = {};
+        const preset = GROUPS.find(g => g.id === save.dataset.group);
+        // Clearing it, or typing the preset name back, drops the override entirely.
+        if (!value || (preset && value === preset.label)) delete state.groupNames[save.dataset.group];
+        else state.groupNames[save.dataset.group] = value;
+        renamingGroup = null;
+        await persist();
+        renderCategories();
+      });
+    }
+
+    // Moving a category between groups — the swatch on its header opens a palette.
+    document.querySelectorAll('.group-swatch').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        editingGroupFor = editingGroupFor === btn.dataset.catId ? null : btn.dataset.catId;
+        renderCategories();
+      });
+    });
+    document.querySelectorAll('.group-editor .palette-dot').forEach(dot => {
+      dot.addEventListener('click', async e => {
+        e.stopPropagation();
+        editingGroupFor = null;
+        await updateCategoryGroup(dot.dataset.catId, dot.dataset.group);
+        renderCategories();
+      });
+    });
+  }
+
+  function renderGroupEditor(cat) {
+    return `
+      <div class="group-editor palette-row">
+        ${GROUPS.map(g => '<button class="palette-dot' + (g.id === catGroup(cat) ? ' selected' : '') +
+          '" data-cat-id="' + cat.id + '" data-group="' + g.id + '" style="--dot-color: ' + groupColorVar(g.id) +
+          '" aria-label="Move to ' + escapeHtml(groupLabel(g.id)) + '"></button>').join('')}
+      </div>`;
+  }
+
+  function renderSortRow() {
+    const row = document.getElementById('sortRow');
+    if (!row) return;
+    row.innerHTML = SORTS.map(x =>
+      '<button class="sort-btn' + (x.id === currentSort ? ' selected' : '') + '" data-sort="' + x.id + '">' + x.label + '</button>'
+    ).join('');
+    row.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentSort = btn.dataset.sort;
+        saveSort(currentSort);
+        renderSortRow();
+        renderCategories();
+      });
+    });
   }
 
   function renderCategoryCard(cat) {
@@ -546,9 +982,9 @@
     const dueOverdue = cat.dueDate && !complete && cat.dueDate < todayKey();
     return `
       <div class="cat-card" data-cat-id="${cat.id}">
-        <div class="cat-header" style="border-left: 4px solid ${cat.color};">
-          <input type="color" class="color-swatch-input cat-color-input" data-cat-id="${cat.id}" value="${cat.color}" style="width:22px; height:22px;">
-          <span class="cat-name ${complete ? 'complete' : ''}">${cat.name}</span>
+        <div class="cat-header" style="border-left: 4px solid ${groupColorVar(catGroup(cat))};">
+          <button class="group-swatch" data-cat-id="${cat.id}" style="--group-color: ${groupColorVar(catGroup(cat))}" aria-label="Change colour group"></button>
+          <span class="cat-name ${complete ? 'complete' : ''}">${escapeHtml(cat.name)}</span>
           ${counts.total > 0 ? `<span class="task-counter ${counts.done === counts.total ? 'complete' : ''}">${counts.done}/${counts.total}</span>` : ''}
           ${complete ? '<span class="cat-check">&#10003;</span>' : ''}
           <div class="cat-actions">
@@ -559,6 +995,7 @@
           </div>
         </div>
         <div class="cat-body">
+          ${editingGroupFor === cat.id ? renderGroupEditor(cat) : ''}
           ${editingDueDateFor === cat.id ? renderDueDateEditor(cat) : ''}
           ${cat.subcategories.map(sc => renderSubcatBlock(cat, sc)).join('')}
           ${addingSubcatFor === cat.id ? renderAddSubcatForm(cat.id) : `<button class="add-row-btn add-subcat-trigger" data-cat-id="${cat.id}">+ Add subcategory</button>`}
@@ -643,7 +1080,7 @@
   function renderAddSubcatForm(catId) {
     return `
       <div class="inline-form" style="margin-top:8px;">
-        <input type="text" class="inline-input new-subcat-name" data-cat-id="${catId}" placeholder="Subcategory name (e.g. Math)">
+        <input type="text" maxlength="80" class="inline-input new-subcat-name" data-cat-id="${catId}" placeholder="Subcategory name (e.g. Math)">
         <div class="inline-row">
           <button class="inline-btn cancel cancel-subcat-btn" data-cat-id="${catId}">Cancel</button>
           <button class="inline-btn confirm confirm-subcat-btn" data-cat-id="${catId}">Add</button>
@@ -655,7 +1092,7 @@
   function renderAddTaskForm(catId, subcatId) {
     return `
       <div class="inline-form" style="margin-top:6px; margin-bottom:8px;">
-        <input type="text" class="inline-input new-task-text" data-cat-id="${catId}" data-subcat-id="${subcatId}" placeholder="Task (e.g. Complete page 54)">
+        <input type="text" maxlength="200" class="inline-input new-task-text" data-cat-id="${catId}" data-subcat-id="${subcatId}" placeholder="Task (e.g. Complete page 54)">
         <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; color:var(--ink-dim);">
           <input type="checkbox" class="new-task-recurring" data-cat-id="${catId}" data-subcat-id="${subcatId}">
           Recurring (resets daily)
@@ -670,14 +1107,6 @@
   }
 
   function attachCategoryListeners() {
-    // Category color change
-    document.querySelectorAll('.cat-color-input').forEach(input => {
-      input.addEventListener('change', async () => {
-        await updateCategoryColor(input.dataset.catId, input.value);
-        renderCategories();
-      });
-    });
-
     // Delete category
     document.querySelectorAll('.delete-cat-btn').forEach(btn => {
       btn.addEventListener('click', () => deleteCategory(btn.dataset.catId));
@@ -987,6 +1416,11 @@
        identity handlers re-render from server data regardless, so failing
        quietly here loses nothing but the head start. */
     try {
+      // Read the two view preferences before the first render, or the list
+      // paints unsorted and fully expanded and then visibly rearranges itself.
+      currentSort = loadSort();
+      collapsedGroups = loadCollapsed();
+      renderSortRow();
       loadLocal();
       renderCategories();
     } catch (e) {

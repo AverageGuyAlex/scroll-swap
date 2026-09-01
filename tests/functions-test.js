@@ -8,33 +8,55 @@
  *   - a rejected credential keeps err.name, which is the half that identifies it
  *   - the happy path still reads and writes under user-<sub>
  *
- * @netlify/blobs is not installed locally, so it is stubbed at require time.
+ * The functions became V2 ES modules on 2026-09-02, so @netlify/blobs can no
+ * longer be stubbed by patching Module._load — an ESM import goes straight past
+ * it. Instead each function's source is read, its single import line swapped for
+ * the injected stub, and the module body evaluated. That is the same trick
+ * sync-test.js and alarm-test.js already use to run page scripts, and it keeps
+ * the tests dependency-free.
  * Run with: node tests/functions-test.js
  */
 const fs = require('fs');
 const path = require('path');
-const Module = require('module');
 
 const DIR = path.join(__dirname, '..', 'netlify', 'functions');
-const FILES = fs.readdirSync(DIR).filter(f => f.endsWith('.js')).sort();
-
-// ---- stub @netlify/blobs before any function is loaded ----
+const FILES = fs.readdirSync(DIR).filter(f => f.endsWith('.mjs')).sort();
 
 let getStoreImpl = () => ({});
 let getStoreCalls = [];
 
-const origLoad = Module._load;
-Module._load = function (request) {
-  if (request === '@netlify/blobs') {
-    return { getStore: (opts) => { getStoreCalls.push(opts); return getStoreImpl(opts); } };
-  }
-  return origLoad.apply(this, arguments);
-};
-
+/* Turns the ES module into something new Function can evaluate: drop the import
+   (getStore arrives as a parameter instead) and turn the default export into a
+   value we can return. Deliberately strict — if the shape of these files ever
+   drifts from the template, this throws rather than silently testing nothing. */
 function loadHandler(file) {
-  const p = path.join(DIR, file);
-  delete require.cache[require.resolve(p)];
-  return require(p).handler;
+  const src = fs.readFileSync(path.join(DIR, file), 'utf8');
+  if (!/^import \{ getStore \} from '@netlify\/blobs';/m.test(src)) {
+    throw new Error(file + ': expected the @netlify/blobs import at the top');
+  }
+  if (!/^export default async \(req, context\) => \{/m.test(src)) {
+    throw new Error(file + ': expected a V2 "export default async (req, context)" handler');
+  }
+  const body = src
+    .replace(/^import \{ getStore \} from '@netlify\/blobs';/m, '')
+    .replace(/^export default /m, 'return ');
+  return new Function('getStore', body)(
+    (opts) => { getStoreCalls.push(opts); return getStoreImpl(opts); }
+  );
+}
+
+// A V2 handler takes a real Request and returns a real Response.
+function request(method, body) {
+  return new Request('https://rotulus.netlify.app/.netlify/functions/x', {
+    method,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+  });
+}
+
+async function readBody(res) {
+  const text = await res.text();
+  try { return JSON.parse(text); } catch (e) { return text; }
 }
 
 // ---- tiny assert harness, matching the other tests in this folder ----
@@ -50,11 +72,6 @@ function check(label, expected, actual) {
 const USER = { clientContext: { user: { sub: 'abc123' } } };
 const NO_USER = { clientContext: {} };
 
-function setEnv(siteID, token) {
-  if (siteID === null) delete process.env.BLOBS_SITE_ID; else process.env.BLOBS_SITE_ID = siteID;
-  if (token === null) delete process.env.BLOBS_TOKEN; else process.env.BLOBS_TOKEN = token;
-}
-
 // ---- scenarios ----
 
 (async () => {
@@ -62,56 +79,55 @@ function setEnv(siteID, token) {
     console.log(`\n=== ${file} ===`);
     const handler = loadHandler(file);
 
-    // A. Unauthenticated, with config ALSO missing: auth must win, and the body
-    //    must not reveal anything about the site's configuration.
-    setEnv(null, null);
+    // A. Unauthenticated. The body must not reveal anything about configuration.
     getStoreCalls = [];
-    let res = await handler({ httpMethod: 'GET' }, NO_USER);
-    check('A. no user -> 401', 401, res.statusCode);
-    check('A. no user -> says nothing about Blobs config', false, /BLOBS|Blobs/.test(res.body));
+    let res = await handler(request('GET'), NO_USER);
+    check('A. no user -> 401', 401, res.status);
+    check('A. no user -> says nothing about Blobs config', false, /BLOBS|Blobs/.test(await res.clone().text()));
     check('A. no user -> never touches the store', 0, getStoreCalls.length);
 
-    // B. Authenticated but the env vars are gone - the likeliest real cause.
-    setEnv(null, null);
-    getStoreCalls = [];
-    res = await handler({ httpMethod: 'GET' }, USER);
-    check('B. missing env vars -> 500', 500, res.statusCode);
-    check('B. missing env vars -> names both', ['BLOBS_SITE_ID', 'BLOBS_TOKEN'], JSON.parse(res.body).missing);
-    check('B. missing env vars -> never calls getStore', 0, getStoreCalls.length);
-
-    // C. Credentials present but rejected: getStore throws. This used to happen
-    //    outside the try and crash the function.
-    setEnv('site-1', 'tok-1');
-    getStoreImpl = () => { const e = new Error('environment has not been configured'); e.name = 'MissingBlobsEnvironmentError'; throw e; };
-    res = await handler({ httpMethod: 'GET' }, USER);
-    check('C. getStore throws -> 500, not a crash', 500, res.statusCode);
-    check('C. getStore throws -> keeps err.name', 'MissingBlobsEnvironmentError', JSON.parse(res.body).name);
-
-    // D. Happy path GET.
-    setEnv('site-1', 'tok-1');
+    // B. There is no env-var branch left to test: V2 configures Blobs itself, so
+    //    BLOBS_SITE_ID/BLOBS_TOKEN are gone and cannot expire. What replaces that
+    //    scenario is proving getStore is called WITHOUT credentials — passing a
+    //    stale siteID/token here would quietly reintroduce the whole problem.
     getStoreCalls = [];
     getStoreImpl = () => ({ get: async () => ({ hello: 'world' }), set: async () => {} });
-    res = await handler({ httpMethod: 'GET' }, USER);
-    check('D. GET -> 200', 200, res.statusCode);
-    check('D. GET -> returns stored data', { hello: 'world' }, JSON.parse(res.body));
-    check('D. GET -> passes siteID and token through', ['site-1', 'tok-1'], [getStoreCalls[0].siteID, getStoreCalls[0].token]);
+    res = await handler(request('GET'), USER);
+    check('B. getStore is called with only a store name', ['name'], Object.keys(getStoreCalls[0] || {}));
+
+    // C. Credentials rejected: getStore throws. This used to happen outside the
+    //    try and crash the function before anything could report the cause.
+    getStoreImpl = () => { const e = new Error('environment has not been configured'); e.name = 'MissingBlobsEnvironmentError'; throw e; };
+    res = await handler(request('GET'), USER);
+    check('C. getStore throws -> 500, not a crash', 500, res.status);
+    check('C. getStore throws -> keeps err.name', 'MissingBlobsEnvironmentError', (await readBody(res)).name);
+
+    // D. Happy path GET.
+    getStoreImpl = () => ({ get: async () => ({ hello: 'world' }), set: async () => {} });
+    res = await handler(request('GET'), USER);
+    check('D. GET -> 200', 200, res.status);
+    check('D. GET -> returns stored data', { hello: 'world' }, await readBody(res));
 
     // E. Happy path POST, and the per-user key must be right.
     let written = null;
     getStoreImpl = () => ({ get: async () => null, set: async (k, v) => { written = { k, v }; } });
-    res = await handler({ httpMethod: 'POST', body: JSON.stringify({ a: 1 }) }, USER);
-    check('E. POST -> 200 ok', { ok: true }, JSON.parse(res.body));
+    res = await handler(request('POST', { a: 1 }), USER);
+    check('E. POST -> 200 ok', { ok: true }, await readBody(res));
     check('E. POST -> writes under user-<sub>', 'user-abc123', written && written.k);
+    check('E. POST -> writes the body it was sent', { a: 1 }, JSON.parse(written.v));
 
     // F. Empty store still returns this page's own default shape, not null.
     getStoreImpl = () => ({ get: async () => null, set: async () => {} });
-    res = await handler({ httpMethod: 'GET' }, USER);
-    check('F. empty store -> 200 with an object', 'object', typeof JSON.parse(res.body));
+    res = await handler(request('GET'), USER);
+    check('F. empty store -> 200 with an object', 'object', typeof (await readBody(res)));
+
+    // G. Anything but GET/POST.
+    res = await handler(request('DELETE'), USER);
+    check('G. DELETE -> 405', 405, res.status);
 
     getStoreImpl = () => ({});
   }
 
-  Module._load = origLoad;
   console.log(failures === 0 ? '\nALL FUNCTION SCENARIOS PASS' : `\n${failures} FUNCTION FAILURE(S)`);
   process.exit(failures === 0 ? 0 : 1);
 })();
