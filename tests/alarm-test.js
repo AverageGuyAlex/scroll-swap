@@ -48,6 +48,7 @@ function fakeEl() {
 
 function run(seedStorage) {
   const audios = [];               // every Audio the page constructs
+  const locks = [];                // every screen wake lock the page requests
   const store = Object.assign({}, seedStorage);
   const localStorage = {
     getItem: (k) => (k in store ? store[k] : null),
@@ -77,6 +78,22 @@ function run(seedStorage) {
     hidden: false, visibilityState: 'visible',
     _h: {},
   };
+  /* The real one is released by iOS on its own whenever the page hides, so the
+     fake records releases rather than just existing. A lock left held is the
+     same class of battery bug as a keep-alive left playing. */
+  const wakeLock = {
+    request: (type) => {
+      const sentinel = {
+        type, released: false,
+        release() { this.released = true; (this._h.release || []).forEach((cb) => cb()); return Promise.resolve(); },
+        addEventListener(t, cb) { (this._h[t] = this._h[t] || []).push(cb); },
+        _h: {},
+      };
+      locks.push(sentinel);
+      return Promise.resolve(sentinel);
+    },
+  };
+
   const win = {
     Audio: FakeAudio,
     location: { href: '', pathname: '/pomodoro.html', hash: '', origin: 'https://rotulus.netlify.app' },
@@ -97,12 +114,12 @@ function run(seedStorage) {
   fn(win, doc, localStorage, () => Promise.resolve({ ok: false }),
      undefined, { log() {}, error() {}, warn() {} },
      () => 0, () => {}, () => 0, () => {}, win.matchMedia,
-     win.requestAnimationFrame, () => {}, () => true, { userAgent: 'test' },
+     win.requestAnimationFrame, () => {}, () => true, { userAgent: 'test', wakeLock },
      () => ({ borderTopLeftRadius: '20px', getPropertyValue: () => '' }),
      class { observe() {} unobserve() {} disconnect() {} });
 
   (win._h['DOMContentLoaded'] || []).forEach((cb) => cb());
-  return { audios, els, store };
+  return { audios, els, store, locks };
 }
 
 function expiredTimerState() {
@@ -141,7 +158,10 @@ console.log('\n=== Alarm respects the off switch ===');
     audios.some((a) => a.src.includes('alarm-chime')), false);
 }
 
-console.log('\n=== Keep-alive while a timer is running ===');
+/* The keep-alive is inaudible but is still real audio, so iOS hands the page the
+   audio focus and pauses Spotify for the whole session. It defaults OFF for that
+   reason — these scenarios are the guard on that default. */
+console.log('\n=== Keep-alive is OFF by default (music is not interrupted) ===');
 {
   const running = JSON.stringify({
     category: 'productivity', mode: 'focus',
@@ -151,12 +171,36 @@ console.log('\n=== Keep-alive while a timer is running ===');
     running: true,
   });
   const { audios } = run({ 'scrollswap_pomodoro_timer': running });
+  check('no keep-alive audio is created at all',
+    audios.some((a) => a.src.includes('alarm-keepalive')), false);
+  check('no chime for a timer still running',
+    audios.some((a) => a.src.includes('alarm-chime')), false);
+}
+
+console.log('\n=== ...and the chime still fires with the keep-alive off ===');
+{
+  const { audios } = run({ 'scrollswap_pomodoro_timer': expiredTimerState() });
+  const chimes = audios.filter((a) => a.src.includes('alarm-chime'));
+  check('a finished session still chimes', chimes.length > 0 && chimes[0].playCount > 0, true);
+}
+
+console.log('\n=== Keep-alive when switched on in Settings ===');
+{
+  const running = JSON.stringify({
+    category: 'productivity', mode: 'focus',
+    durationSeconds: 1500, focusDurationSeconds: 1500,
+    remainingAtAnchor: 1500,
+    anchorTimestamp: Date.now() - 60 * 1000,
+    running: true,
+  });
+  const { audios } = run({
+    'scrollswap_pomodoro_timer': running,
+    'scrollswap_pomodoro_keepalive': 'on',
+  });
   const keep = audios.filter((a) => a.src.includes('alarm-keepalive'));
   check('keep-alive audio is created', keep.length > 0, true);
   check('keep-alive is looping', keep.length > 0 && keep[0].loop, true);
   check('keep-alive is playing', keep.length > 0 && keep[0].playCount > 0, true);
-  check('no chime for a timer still running',
-    audios.some((a) => a.src.includes('alarm-chime')), false);
 }
 
 /* A keep-alive left playing is a permanent battery drain, so the stop path
@@ -182,12 +226,48 @@ function fireClick(els, id) {
 
 console.log('\n=== Keep-alive stops when the timer does ===');
 for (const control of ['resetBtn', 'pauseBtn']) {
-  const { audios, els } = run({ 'scrollswap_pomodoro_timer': runningTimerState() });
+  const { audios, els } = run({
+    'scrollswap_pomodoro_timer': runningTimerState(),
+    'scrollswap_pomodoro_keepalive': 'on',
+  });
   const keep = audios.find((a) => a.src.includes('alarm-keepalive'));
   check(`[${control}] keep-alive is playing to begin with`, !!keep && !keep.paused, true);
   fireClick(els, control);
   check(`[${control}] keep-alive is paused afterwards`, !!keep && keep.paused, true);
 }
 
-console.log(failures === 0 ? '\nALL ALARM SCENARIOS PASS' : `\n${failures} FAILURE(S)`);
-process.exit(failures === 0 ? 0 : 1);
+/* The wake lock is what replaces the keep-alive, without touching audio.
+   requestWakeLock() awaits, so these assertions have to run a microtask later —
+   the harness's setTimeout is a no-op stub, so flush with a resolved promise. */
+(async function () {
+  console.log('\n=== Screen wake lock while a timer runs ===');
+  {
+    const { locks } = run({ 'scrollswap_pomodoro_timer': runningTimerState() });
+    await Promise.resolve(); await Promise.resolve();
+    check('a screen wake lock is requested', locks.length > 0, true);
+    check('it is a screen lock', locks.length > 0 && locks[0].type, 'screen');
+    check('it is still held while the timer runs', locks.length > 0 && locks[0].released, false);
+  }
+
+  console.log('\n=== Wake lock is released when the timer stops ===');
+  for (const control of ['resetBtn', 'pauseBtn']) {
+    const { els, locks } = run({ 'scrollswap_pomodoro_timer': runningTimerState() });
+    await Promise.resolve(); await Promise.resolve();
+    check(`[${control}] wake lock is held to begin with`,
+      locks.length > 0 && !locks[0].released, true);
+    fireClick(els, control);
+    check(`[${control}] wake lock is released afterwards`,
+      locks.length > 0 && locks[0].released, true);
+  }
+
+  console.log('\n=== A finished timer never takes a wake lock ===');
+  {
+    const { locks } = run({ 'scrollswap_pomodoro_timer': expiredTimerState() });
+    await Promise.resolve(); await Promise.resolve();
+    check('no wake lock held for a session that already ended',
+      locks.some((l) => !l.released), false);
+  }
+
+  console.log(failures === 0 ? '\nALL ALARM SCENARIOS PASS' : `\n${failures} FAILURE(S)`);
+  process.exit(failures === 0 ? 0 : 1);
+})();

@@ -116,6 +116,13 @@
     <label class="setting-label" style="margin-top:16px;">Lock screen notification</label>
     <button class="auth-btn secondary" id="notifyBtn" style="width:100%;">Enable notifications</button>
     <p class="gear-note" id="notifyNote" style="margin-top:10px;"></p>
+
+    <label class="setting-label" style="margin-top:16px;">Keep the alarm on time in the background</label>
+    <div class="seg-row">
+      <button class="seg-btn" data-keepalive="off">Off</button>
+      <button class="seg-btn" data-keepalive="on">On</button>
+    </div>
+    <p class="gear-note">Off keeps your music playing. On plays a near-silent background track so the chime lands exactly at zero even with the phone locked &mdash; but your phone will pause Spotify, or any other music, for the whole session.</p>
   </div>
 </div>
 
@@ -229,6 +236,28 @@
     renderAlarmToggle();
   }
 
+  /* The keep-alive is what pauses other apps' music, so unlike the chime above
+     it defaults OFF — note the '=== on' rather than '!== off'. */
+  const KEEPALIVE_ENABLED_KEY = 'scrollswap_pomodoro_keepalive';
+
+  function renderKeepAliveToggle() {
+    let on = false;
+    try { on = localStorage.getItem(KEEPALIVE_ENABLED_KEY) === 'on'; } catch (e) {}
+    document.querySelectorAll('.seg-btn[data-keepalive]').forEach(function (b) {
+      b.classList.toggle('selected', b.dataset.keepalive === (on ? 'on' : 'off'));
+    });
+  }
+
+  function initKeepAliveToggle() {
+    document.querySelectorAll('.seg-btn[data-keepalive]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        try { localStorage.setItem(KEEPALIVE_ENABLED_KEY, b.dataset.keepalive); } catch (e) {}
+        renderKeepAliveToggle();
+      });
+    });
+    renderKeepAliveToggle();
+  }
+
   /* iOS only grants notification permission from a user gesture, and only in a
      PWA added to the Home Screen. Asking from a button here rather than on the
      first Start keeps the permission sheet away from the moment the app is
@@ -275,6 +304,7 @@
   function initApp() {
     initResetHour();
     initAlarmToggle();
+    initKeepAliveToggle();
     initNotifyButton();
   }
 

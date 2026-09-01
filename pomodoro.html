@@ -733,6 +733,7 @@
       timerDisplayHandle = null;
     }
     stopKeepAlive();
+    releaseWakeLock();
   }
 
   /* ---- Completion alarm -------------------------------------------------
@@ -742,6 +743,7 @@
      run this file with no Audio and no Notification, and a bare reference
      would throw ReferenceError. */
   const ALARM_ENABLED_KEY = 'scrollswap_pomodoro_alarm';
+  const KEEPALIVE_ENABLED_KEY = 'scrollswap_pomodoro_keepalive';
   const CHIME_SRC = '/assets/alarm-chime.wav';
   const CHIME_REPEATS = 3;
   const CHIME_GAP_MS = 2000;
@@ -752,6 +754,13 @@
   function alarmEnabled() {
     try { return localStorage.getItem(ALARM_ENABLED_KEY) !== 'off'; }
     catch (e) { return true; }
+  }
+
+  /* Note the '=== on' — the chime above defaults ON and reads '!== off', this one
+     defaults OFF. See the keep-alive block below for why they differ. */
+  function keepAliveEnabled() {
+    try { return localStorage.getItem(KEEPALIVE_ENABLED_KEY) === 'on'; }
+    catch (e) { return false; }
   }
 
   function stopChime() {
@@ -812,11 +821,19 @@
     } catch (e) {}
   }
 
-  /* ---- Keep-alive -------------------------------------------------------
+  /* ---- Keep-alive (OPT-IN, default off) ---------------------------------
      Media playback is what stops iOS suspending a backgrounded page, which is
      what keeps tick() firing so the alarm lands at zero rather than whenever
      you next open the app. The track is near-inaudible noise rather than
      digital silence, which iOS optimises away.
+
+     THAT IS ALSO WHY IT IS OFF BY DEFAULT. Inaudible to a person is still real
+     audio to the phone: iOS hands this page the audio focus the moment it
+     starts, which pauses Spotify and everything else for the whole session.
+     The two are one mechanism — no browser API separates "keeps the page awake"
+     from "interrupts other apps" — so the reliable alarm and the uninterrupted
+     music cannot both be had. Music wins by default; scrollswap_pomodoro_keepalive
+     = 'on' (Settings) buys the on-time alarm back at the cost of the music.
 
      This is an empirical trick, not a guaranteed API. If iOS suspends the page
      anyway the alarm fires on reopen instead — the same behaviour as before
@@ -825,6 +842,7 @@
   let keepAliveAudio = null;
 
   function startKeepAlive() {
+    if (!keepAliveEnabled()) return;
     if (keepAliveAudio || !window.Audio) return;
     try {
       keepAliveAudio = new window.Audio(KEEPALIVE_SRC);
@@ -855,6 +873,46 @@
     keepAliveAudio = null;
   }
 
+  /* ---- Screen wake lock -------------------------------------------------
+     What is left once the keep-alive is off by default. It touches no audio at
+     all, so music is unaffected: it only stops the screen auto-locking while
+     Rotulus is open and counting, which keeps the page awake and the chime on
+     time for a phone sitting face-up on the desk. iOS releases it by itself
+     whenever the page is hidden, so it can only hold a screen that was already
+     on — hence no setting for it. */
+  let wakeLock = null;
+  let wakeLockPending = false;
+  /* Deliberately a flag of its own rather than a timerDisplayHandle check: a
+     timer id is only guaranteed to be non-zero in a browser, and reading one as
+     "is a timer running" made the lock drop itself the instant it was acquired. */
+  let wakeLockWanted = false;
+
+  async function requestWakeLock() {
+    wakeLockWanted = true;
+    if (wakeLock || wakeLockPending) return;
+    // Absent below Safari 16.4, and request() rejects outright in Low Power Mode.
+    if (!navigator.wakeLock || document.visibilityState !== 'visible') return;
+    wakeLockPending = true;
+    try {
+      const s = await navigator.wakeLock.request('screen');
+      wakeLockPending = false;
+      // The timer may have been stopped while we were awaiting.
+      if (!wakeLockWanted) { try { s.release(); } catch (e) {} return; }
+      wakeLock = s;
+      s.addEventListener('release', function () { if (wakeLock === s) wakeLock = null; });
+    } catch (e) { wakeLockPending = false; }
+  }
+
+  /* startDisplayTicker() calls stopDisplayTicker() first, so every restart is a
+     release immediately followed by a request. Clearing the variables BEFORE the
+     async release is what stops the late release nulling a lock acquired since. */
+  function releaseWakeLock() {
+    wakeLockWanted = false;
+    const s = wakeLock;
+    wakeLock = null;
+    if (s) { try { s.release(); } catch (e) {} }
+  }
+
   function tick() {
     const ts = loadTimerState();
     if (!ts.running) { stopDisplayTicker(); return; }
@@ -866,14 +924,18 @@
     }
   }
 
-  /* The keep-alive hangs off the ticker rather than the individual buttons.
-     These two functions already mean "a timer is counting" and are called from
-     all seven places that start or stop one, so the audio cannot drift out of
-     step the way seven hand-placed calls would. */
+  /* The keep-alive and the wake lock both hang off the ticker rather than the
+     individual buttons. These two functions already mean "a timer is counting"
+     and are called from all seven places that start or stop one, so neither can
+     drift out of step the way seven hand-placed calls would. That also gets the
+     wake lock re-acquired for free after iOS drops it on hide: the
+     visibilitychange handler calls displayTimerFromLocal(), which restarts the
+     ticker for a still-running timer. */
   function startDisplayTicker() {
     stopDisplayTicker();
-    startKeepAlive();
     timerDisplayHandle = setInterval(tick, 1000);
+    startKeepAlive();
+    requestWakeLock();
   }
 
   async function completeTimer(ts) {

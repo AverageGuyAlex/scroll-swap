@@ -146,20 +146,38 @@ and a `.flash-highlight` pulse on the timer card.
   and fires all three. `displayTimerFromLocal()` handles a session that ended
   while the app was closed — it chimes and flashes but deliberately shows **no
   banner**, because you are already looking at the screen by then.
-- **The keep-alive is why the alarm lands on time.** `assets/alarm-keepalive.wav`
-  is a looping, near-inaudible track — not digital silence, which iOS optimises
-  away. Media playback is what stops iOS suspending a backgrounded page, so
-  `tick()` keeps running with the screen off. It hangs off
-  `startDisplayTicker()`/`stopDisplayTicker()` rather than the individual
-  buttons, because those two already mean "a timer is counting" and cover all
-  seven call sites without being able to drift.
+- **The keep-alive is why the alarm lands on time — and it is OFF by default.**
+  `assets/alarm-keepalive.wav` is a looping, near-inaudible track — not digital
+  silence, which iOS optimises away. Media playback is what stops iOS suspending
+  a backgrounded page, so `tick()` keeps running with the screen off.
+  **Inaudible to a person is still real audio to the phone**: iOS hands the page
+  the audio focus the moment it starts, which pauses Spotify and every other app's
+  music for the whole session. That is one mechanism, not two — no browser API
+  separates "keeps the page awake" from "interrupts other apps" — so a reliable
+  alarm and uninterrupted music cannot both be had on iOS. Music wins by default
+  (changed 2026-09-01, after the interruption was reported as a bug).
+  `scrollswap_pomodoro_keepalive` = `'on'` buys the on-time alarm back.
   **This is an empirical trick, not a guaranteed API.** If iOS suspends the
   page anyway, the alarm fires on reopen — the pre-feature behaviour, so the
   worst case is no regression.
-- **A keep-alive left playing is a permanent battery drain.** `tests/alarm-test.js`
-  guards the stop path by firing the Reset and Pause handlers directly. It
-  cannot be checked in a browser: `new Audio()` returns a **detached** element,
-  so `document.querySelectorAll('audio')` never finds it.
+- **The screen wake lock is what carries the alarm now.** It touches no audio, so
+  music is unaffected; it only stops the screen auto-locking while the page is
+  visible and a timer is counting, which covers a phone face-up on the desk. iOS
+  releases it on its own whenever the page hides, so it can only hold a screen
+  that was already on — hence no setting for it. Re-acquiring is free: the
+  existing `visibilitychange` handler calls `displayTimerFromLocal()`, which
+  restarts the ticker. It needs no new listener.
+  **Liveness is tracked by `wakeLockWanted`, deliberately not by
+  `timerDisplayHandle`.** A timer id is only guaranteed non-zero in a browser;
+  reading one as "a timer is running" made the lock release itself the instant it
+  resolved, under a test harness whose `setInterval` returns `0`.
+- **A keep-alive left playing, or a wake lock left held, is a permanent battery
+  drain.** `tests/alarm-test.js` guards both stop paths by firing the Reset and
+  Pause handlers directly. Neither can be checked in a browser: `new Audio()`
+  returns a **detached** element, so `document.querySelectorAll('audio')` never
+  finds it. The wake-lock assertions are `async` — `requestWakeLock()` awaits,
+  and the harness's `setTimeout` is a no-op stub, so they flush with
+  `await Promise.resolve()` and own the file's summary and exit code.
 - **`sw.js` exists only because iOS has no `Notification` constructor** — a
   banner must come from `ServiceWorkerRegistration.showNotification()`. There
   is no push and **no `fetch` handler**, so it cannot cache and cannot serve
@@ -167,8 +185,11 @@ and a `.flash-highlight` pulse on the timer card.
   and no `?v=` bump would rescue it. Removing it from devices that already have
   it requires shipping a version that calls `self.registration.unregister()` —
   deleting the file is not enough.
-- **The alarm setting key is `scrollswap_pomodoro_alarm`** (`'on'`/`'off'`,
-  default on). The prefix is mandatory — see the key-prefix trap above.
+- **Two setting keys, with opposite defaults, and that is easy to get backwards.**
+  `scrollswap_pomodoro_alarm` (the chime) defaults **on** and is read `!== 'off'`;
+  `scrollswap_pomodoro_keepalive` defaults **off** and is read `=== 'on'`. Both
+  live in `pomodoro.html` and `settings.html` and must agree in both places.
+  The prefix is mandatory — see the key-prefix trap above.
   `Notification.permission` is the only source of truth for whether a banner can
   show; there is deliberately no second flag that could disagree with it.
 - **The alarm toggle uses `.seg-btn`, not `.theme-btn`.** `applyTheme()` clears
@@ -406,12 +427,16 @@ Don't reintroduce that pattern on a new page.
   push changes, clone `AverageGuyAlex/scroll-swap` fresh to a temp location,
   copy changed/new files over, commit, and push from there — don't `git init`
   in place (would lose history / diverge from the real repo).
-- **Line-ending trap when committing:** the GitHub repo stores files with
-  **CRLF**, this folder is **LF**. Copying edited files straight into a fresh
-  clone marks every line of every file as changed and makes the diff
-  unreviewable. Copy only the files actually edited, then convert them with
-  `perl -pi -e 's/(?<!\r)\n\z/\r\n/' <file>`. Check `git diff --stat` before
-  committing — a sane diff is tens of lines, not thousands.
+- **Line-ending trap when committing:** this folder is **LF** throughout, but the
+  GitHub repo is **mixed** — `netlify.toml` and `package.json` are **LF** there,
+  every HTML/CSS/JS/test/Markdown file is **CRLF**. Copying edited files straight
+  into a fresh clone marks every line of every file as changed and makes the diff
+  unreviewable. Copy only the files actually edited, then convert **only the CRLF
+  ones** with `perl -pi -e 's/(?<!\r)\n\z/\r\n/' <file>` — running that over
+  `netlify.toml` or `package.json` rewrites them whole for no reason. Check
+  `git diff --stat` before committing — a sane diff is tens of lines, not
+  thousands. **Never run the conversion over a binary file** such as a `.wav`; it
+  corrupts it. Verify a copied binary with `cmp -s` against the source.
 - The user generates mockups/images themselves (AI-generated) and supplies
   them on request — when a design needs an asset, list exact filenames and
   dimensions and wait for them to drop the files in.
