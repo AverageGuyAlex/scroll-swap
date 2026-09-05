@@ -2,13 +2,6 @@ import { getStore } from '@netlify/blobs';
 
 /* A V2 function (export default, Request in / Response out).
 
-   It was a V1 one (exports.handler) until 2026-09-02, and that mattered: V1
-   does NOT get Netlify Blobs configured for it, so this file used to need
-   BLOBS_SITE_ID and a BLOBS_TOKEN personal access token set by hand. Those
-   tokens expire, and when this one did every device lost sync at once with no
-   code change and nothing in the repo to explain why. V2 configures Blobs
-   itself, so there is no longer any credential here to go stale.
-
    All six functions in this folder are this same file with the store name and
    the empty-state default swapped. Change one and you almost certainly need to
    change all six; tests/functions-test.js runs every one of them. */
@@ -34,17 +27,65 @@ function json(body, status) {
   });
 }
 
+/* Who is calling?
+
+   READ THIS BEFORE CHANGING IT. From 2026-09-02 to 2026-09-03 these functions
+   asked `context.clientContext.user`, and every single logged-in request got a
+   401 for a month. `clientContext` belongs to the V1 Lambda signature
+   (`exports.handler = async (event, context)`); the V2 context object is a
+   different type entirely and has no such property — it carries account,
+   cookies, deploy, geo, ip, params, requestId, server, site, url and waitUntil,
+   and nothing about the caller's identity. So the check was reading undefined
+   and refusing everyone.
+
+   It hid for a month because an authenticated 401 and an unauthenticated 401
+   are byte-identical, and the only live check ever run was the unauthenticated
+   one. Do not "verify" these functions that way again — log in and read data.
+
+   The token is therefore verified against Identity itself, which is the only
+   thing that can actually vouch for it. `@netlify/identity`'s getUser() is not
+   a substitute: server-side it reads an nf_jwt cookie or a Netlify-injected
+   global, never the Authorization header these pages send. */
+async function identityUser(req) {
+  const header = req.headers.get('authorization') || '';
+  const match = /^Bearer (.+)$/i.exec(header.trim());
+  if (!match) return { user: null };
+
+  let res;
+  try {
+    res = await fetch(new URL('/.netlify/identity/user', req.url), {
+      headers: { Authorization: 'Bearer ' + match[1] },
+    });
+  } catch (err) {
+    /* Identity itself is unreachable. This is NOT the same as a bad token, and
+       must never be reported as one — an infrastructure failure wearing a 401
+       is exactly what made the bug above invisible. */
+    return { user: null, unavailable: true };
+  }
+  if (res.status >= 500) return { user: null, unavailable: true };
+  if (!res.ok) return { user: null };
+
+  const user = await res.json().catch(() => null);
+  return { user: user && user.id ? user : null };
+}
+
 export default async (req, context) => {
-  /* The 401 stays first, before anything touches the store. It is the only
-     thing between a stranger and the data, and it deliberately says nothing
+  /* Auth stays first, before anything touches the store. It is the only thing
+     between a stranger and the data, and the 401 body deliberately says nothing
      about configuration — an unauthenticated caller must not be able to learn
      whether the site's credentials are set. */
-  const user = context && context.clientContext && context.clientContext.user;
+  const { user, unavailable } = await identityUser(req);
+  if (unavailable) {
+    return json({ error: 'Could not verify login', name: 'IdentityUnavailable' }, 503);
+  }
   if (!user) {
     return json({ error: 'Not authenticated' }, 401);
   }
 
-  const userKey = `user-${user.sub}`;
+  /* user.id is the same value the JWT calls "sub" (verified against a live
+     token, 2026-09-03). Existing blobs are filed under it — changing this key
+     orphans everyone's data. */
+  const userKey = `user-${user.id}`;
 
   try {
     /* Inside the try deliberately. getStore() throws when credentials are

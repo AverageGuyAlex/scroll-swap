@@ -104,19 +104,55 @@ file with two things swapped: the Blobs store name and the empty-state default a
 - **One test guards the whole point of the migration:** getStore must be called
   with `['name']` and nothing else. Passing a siteID or token back in would
   quietly reintroduce the expiring credential.
-- **The 401 check must stay first**, before the env-var check and before any store
-  access. It is the only thing standing between a stranger and the data, and its
-  body deliberately says nothing about configuration — an unauthenticated caller
-  must not learn whether the site's credentials are set. Tested.
+- **Authentication: verify the token against Identity. NEVER `clientContext`.**
+  This is the single most expensive mistake made in this repo. From 2026-09-02
+  to 2026-09-03 these functions asked `context.clientContext.user`, and **every
+  logged-in request got a 401 for a month** — sync was completely dead and
+  nothing said so. `clientContext` is part of the **V1 Lambda signature**
+  (`exports.handler = async (event, context)`). The V2 context object is a
+  different type altogether: `account, cookies, deploy, geo, ip, json, log,
+  next, params, requestId, rewrite, server, site, url, waitUntil` — and nothing
+  identifying the caller. The V1→V2 migration changed the signature and kept the
+  V1 auth check, so it read `undefined` and refused everyone.
+  The functions now read the `Authorization: Bearer` header and verify it by
+  calling `/.netlify/identity/user` with that token — Identity is the only thing
+  that can actually vouch for a JWT. **Do not swap this for
+  `@netlify/identity`'s `getUser()`**: server-side that reads an `nf_jwt` cookie
+  or a Netlify-injected global, never the Authorization header these pages send.
+- **The user key is `user-<id>` and must never change.** `user.id` from
+  `/.netlify/identity/user` is the same value the JWT calls `sub`, which is what
+  every existing blob is filed under (verified against a live token 2026-09-03).
+  Changing it orphans all synced data silently — reads would just return the
+  empty default.
+- **"It returns a clean 401" is NOT a verification. It is how the outage hid.**
+  An authenticated 401 and an unauthenticated 401 are byte-identical, so that
+  check cannot tell *correctly refusing a stranger* from *refusing everybody*.
+  It was the only live check run after the V2 migration, and it passed happily
+  for a month. **To verify these functions, log in and read real data back** —
+  or from the browser console on the live site:
+  ```js
+  netlifyIdentity.currentUser().jwt().then(t=>fetch('/.netlify/functions/habits',
+    {headers:{Authorization:'Bearer '+t}})).then(r=>r.text().then(b=>console.log(r.status,b)))
+  ```
+- **An infrastructure failure must never wear a 401.** If Identity itself is
+  unreachable or 5xx, the functions return **503 `IdentityUnavailable`**, not
+  401. Ambiguity between "your token is bad" and "the thing that checks tokens is
+  down" is precisely what made the month-long outage invisible.
+- **The 401 body deliberately says nothing about configuration** — an
+  unauthenticated caller must not learn whether the site's credentials are set.
+  Auth still runs before anything touches the store. Tested.
 - **`getStore()` belongs inside the `try`.** It used to sit above it, so a
   rejected credential crashed the whole function before the `catch` could report
   anything, and the client saw a bare failure with no cause. The `catch` now
   returns `err.name` too — the SDK throws `MissingBlobsEnvironmentError` by name,
-  which is the half that actually identifies the problem.
+  which is the half that actually identifies the problem — but **not**
+  `err.message`, which can carry internal detail; that goes to `console.error`
+  and so to the Netlify function log, where only the site owner can read it.
 - **Diagnosing a sync failure from the browser:** the status code names the layer.
-  `401` = Identity isn't populating `clientContext`; `500` with a `missing` array
-  = env vars absent; `500` with a `name` = credentials rejected; a bare platform
-  `502` = something threw outside the handler entirely.
+  `401` = no token sent, or Identity rejected it; `503` with `IdentityUnavailable`
+  = Identity is down, so the token could not be checked either way; `500` with a
+  `name` = Blobs credentials rejected; `400`/`413` = the request body was junk or
+  oversized; a bare platform `502` = something threw outside the handler entirely.
 - **`package-lock.json` pins `@netlify/blobs` to 8.2.0.** Before it existed,
   `^8.1.0` re-resolved on every deploy. Keep the lockfile committed. The package
   is on 11.x now, so an upgrade is a real (and separate) piece of work — the V1
