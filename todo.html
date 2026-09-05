@@ -16,10 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="stylesheet" href="/css/rotulus.css?v=7">
+<link rel="stylesheet" href="/css/rotulus.css?v=8">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=7"></script>
+<script defer src="/js/rotulus-shared.js?v=8"></script>
 
 <style>
   /* Page-specific: to-do */
@@ -247,7 +247,7 @@
   </div>
 
   <div class="header">
-    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
+    <img class="header-art" src="/assets/header-illustration.png" alt="">
     <p class="eyebrow">Tasks</p>
     <h1 class="title">To-Do</h1>
     <p class="subtitle">Categories, subcategories, and tasks &mdash; recurring or one-time.</p>
@@ -955,7 +955,7 @@
     return `
       <div class="group-editor palette-row">
         ${GROUPS.map(g => '<button class="palette-dot' + (g.id === catGroup(cat) ? ' selected' : '') +
-          '" data-cat-id="' + cat.id + '" data-group="' + g.id + '" style="--dot-color: ' + groupColorVar(g.id) +
+          '" data-cat-id="' + escapeHtml(cat.id) + '" data-group="' + g.id + '" style="--dot-color: ' + groupColorVar(g.id) +
           '" aria-label="Move to ' + escapeHtml(groupLabel(g.id)) + '"></button>').join('')}
       </div>`;
   }
@@ -981,24 +981,24 @@
     const counts = countCatTasks(cat);
     const dueOverdue = cat.dueDate && !complete && cat.dueDate < todayKey();
     return `
-      <div class="cat-card" data-cat-id="${cat.id}">
+      <div class="cat-card" data-cat-id="${escapeHtml(cat.id)}">
         <div class="cat-header" style="border-left: 4px solid ${groupColorVar(catGroup(cat))};">
-          <button class="group-swatch" data-cat-id="${cat.id}" style="--group-color: ${groupColorVar(catGroup(cat))}" aria-label="Change colour group"></button>
+          <button class="group-swatch" data-cat-id="${escapeHtml(cat.id)}" style="--group-color: ${groupColorVar(catGroup(cat))}" aria-label="Change colour group"></button>
           <span class="cat-name ${complete ? 'complete' : ''}">${escapeHtml(cat.name)}</span>
           ${counts.total > 0 ? `<span class="task-counter ${counts.done === counts.total ? 'complete' : ''}">${counts.done}/${counts.total}</span>` : ''}
           ${complete ? '<span class="cat-check">&#10003;</span>' : ''}
           <div class="cat-actions">
-            <button class="cat-due-btn ${dueOverdue ? 'overdue' : ''}" data-cat-id="${cat.id}">
+            <button class="cat-due-btn ${dueOverdue ? 'overdue' : ''}" data-cat-id="${escapeHtml(cat.id)}">
               ${cat.dueDate ? `Due ${formatShortDate(cat.dueDate)}` : 'Set due date'}
             </button>
-            <button class="icon-btn delete-cat-btn" data-cat-id="${cat.id}">&times;</button>
+            <button class="icon-btn delete-cat-btn" data-cat-id="${escapeHtml(cat.id)}">&times;</button>
           </div>
         </div>
         <div class="cat-body">
           ${editingGroupFor === cat.id ? renderGroupEditor(cat) : ''}
           ${editingDueDateFor === cat.id ? renderDueDateEditor(cat) : ''}
           ${cat.subcategories.map(sc => renderSubcatBlock(cat, sc)).join('')}
-          ${addingSubcatFor === cat.id ? renderAddSubcatForm(cat.id) : `<button class="add-row-btn add-subcat-trigger" data-cat-id="${cat.id}">+ Add subcategory</button>`}
+          ${addingSubcatFor === cat.id ? renderAddSubcatForm(cat.id) : `<button class="add-row-btn add-subcat-trigger" data-cat-id="${escapeHtml(cat.id)}">+ Add subcategory</button>`}
         </div>
       </div>
     `;
@@ -1007,11 +1007,11 @@
   function renderDueDateEditor(cat) {
     return `
       <div class="due-date-editor">
-        <input type="date" class="inline-input due-date-input" data-cat-id="${cat.id}" value="${cat.dueDate || ''}">
+        <input type="date" class="inline-input due-date-input" data-cat-id="${escapeHtml(cat.id)}" value="${escapeHtml(cat.dueDate || '')}">
         <div class="inline-row">
-          <button class="inline-btn cancel clear-due-btn" data-cat-id="${cat.id}">Clear</button>
-          <button class="inline-btn cancel cancel-due-btn" data-cat-id="${cat.id}">Cancel</button>
-          <button class="inline-btn confirm save-due-btn" data-cat-id="${cat.id}">Save</button>
+          <button class="inline-btn cancel clear-due-btn" data-cat-id="${escapeHtml(cat.id)}">Clear</button>
+          <button class="inline-btn cancel cancel-due-btn" data-cat-id="${escapeHtml(cat.id)}">Cancel</button>
+          <button class="inline-btn confirm save-due-btn" data-cat-id="${escapeHtml(cat.id)}">Save</button>
         </div>
       </div>
     `;
@@ -1023,12 +1023,12 @@
     const expanded = expandedSubcats.has(subcat.id);
     return `
       <div class="subcat-block">
-        <div class="subcat-header" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">
+        <div class="subcat-header" data-cat-id="${escapeHtml(cat.id)}" data-subcat-id="${escapeHtml(subcat.id)}">
           <span class="subcat-chevron ${expanded ? 'open' : ''}">&#9656;</span>
-          <span class="subcat-name ${complete ? 'complete' : ''}">${subcat.name}</span>
+          <span class="subcat-name ${complete ? 'complete' : ''}">${escapeHtml(subcat.name)}</span>
           ${counts.total > 0 ? `<span class="task-counter ${counts.done === counts.total ? 'complete' : ''}">${counts.done}/${counts.total}</span>` : ''}
           ${complete ? '<span class="subcat-check">&#10003;</span>' : ''}
-          <button class="icon-btn delete-subcat-btn" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">&times;</button>
+          <button class="icon-btn delete-subcat-btn" data-cat-id="${escapeHtml(cat.id)}" data-subcat-id="${escapeHtml(subcat.id)}">&times;</button>
         </div>
         ${expanded ? `
           <div class="task-list">
@@ -1036,7 +1036,7 @@
           </div>
           ${addingTaskFor && addingTaskFor.categoryId === cat.id && addingTaskFor.subcatId === subcat.id
             ? renderAddTaskForm(cat.id, subcat.id)
-            : `<button class="add-row-btn add-task-trigger" data-cat-id="${cat.id}" data-subcat-id="${subcat.id}">+ Add task</button>`}
+            : `<button class="add-row-btn add-task-trigger" data-cat-id="${escapeHtml(cat.id)}" data-subcat-id="${escapeHtml(subcat.id)}">+ Add task</button>`}
         ` : ''}
       </div>
     `;
@@ -1045,11 +1045,11 @@
   function renderTaskDueDateEditor(catId, subcatId, task) {
     return `
       <div class="due-date-editor" style="margin: 4px 0 8px 34px;">
-        <input type="date" class="inline-input task-due-date-input" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}" value="${task.scheduledDate || ''}">
+        <input type="date" class="inline-input task-due-date-input" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}" data-task-id="${escapeHtml(task.id)}" value="${escapeHtml(task.scheduledDate || '')}">
         <div class="inline-row">
-          <button class="inline-btn cancel clear-task-due-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">Clear</button>
-          <button class="inline-btn cancel cancel-task-due-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">Cancel</button>
-          <button class="inline-btn confirm save-task-due-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">Save</button>
+          <button class="inline-btn cancel clear-task-due-btn" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}" data-task-id="${escapeHtml(task.id)}">Clear</button>
+          <button class="inline-btn cancel cancel-task-due-btn" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}" data-task-id="${escapeHtml(task.id)}">Cancel</button>
+          <button class="inline-btn confirm save-task-due-btn" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}" data-task-id="${escapeHtml(task.id)}">Save</button>
         </div>
       </div>
     `;
@@ -1062,16 +1062,16 @@
       && editingTaskDueFor.subcatId === subcatId && editingTaskDueFor.taskId === task.id;
     return `
       <div class="task-row">
-        <div class="task-box ${done ? 'checked' : ''}" data-task-id="${task.id}" data-cat-id="${catId}" data-subcat-id="${subcatId}">
+        <div class="task-box ${done ? 'checked' : ''}" data-task-id="${escapeHtml(task.id)}" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}">
           ${checkmarkSVG()}
         </div>
-        <span class="task-text ${done ? 'checked' : ''}" data-task-id="${task.id}" data-cat-id="${catId}" data-subcat-id="${subcatId}">${task.text}</span>
+        <span class="task-text ${done ? 'checked' : ''}" data-task-id="${escapeHtml(task.id)}" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}">${escapeHtml(task.text)}</span>
         ${task.recurring ? '<span class="task-badge">Recurring</span>' : `
-          <button class="task-due-btn ${overdue ? 'overdue' : ''}" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">
+          <button class="task-due-btn ${overdue ? 'overdue' : ''}" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}" data-task-id="${escapeHtml(task.id)}">
             ${task.scheduledDate ? `${overdue ? 'Overdue ' : ''}${formatShortDate(task.scheduledDate)}` : 'Set due date'}
           </button>
         `}
-        <button class="icon-btn delete-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}" data-task-id="${task.id}">&times;</button>
+        <button class="icon-btn delete-task-btn" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}" data-task-id="${escapeHtml(task.id)}">&times;</button>
       </div>
       ${isEditingThis ? renderTaskDueDateEditor(catId, subcatId, task) : ''}
     `;
@@ -1080,10 +1080,10 @@
   function renderAddSubcatForm(catId) {
     return `
       <div class="inline-form" style="margin-top:8px;">
-        <input type="text" maxlength="80" class="inline-input new-subcat-name" data-cat-id="${catId}" placeholder="Subcategory name (e.g. Math)">
+        <input type="text" maxlength="80" class="inline-input new-subcat-name" data-cat-id="${escapeHtml(catId)}" placeholder="Subcategory name (e.g. Math)">
         <div class="inline-row">
-          <button class="inline-btn cancel cancel-subcat-btn" data-cat-id="${catId}">Cancel</button>
-          <button class="inline-btn confirm confirm-subcat-btn" data-cat-id="${catId}">Add</button>
+          <button class="inline-btn cancel cancel-subcat-btn" data-cat-id="${escapeHtml(catId)}">Cancel</button>
+          <button class="inline-btn confirm confirm-subcat-btn" data-cat-id="${escapeHtml(catId)}">Add</button>
         </div>
       </div>
     `;
@@ -1092,15 +1092,15 @@
   function renderAddTaskForm(catId, subcatId) {
     return `
       <div class="inline-form" style="margin-top:6px; margin-bottom:8px;">
-        <input type="text" maxlength="200" class="inline-input new-task-text" data-cat-id="${catId}" data-subcat-id="${subcatId}" placeholder="Task (e.g. Complete page 54)">
+        <input type="text" maxlength="200" class="inline-input new-task-text" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}" placeholder="Task (e.g. Complete page 54)">
         <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; color:var(--ink-dim);">
-          <input type="checkbox" class="new-task-recurring" data-cat-id="${catId}" data-subcat-id="${subcatId}">
+          <input type="checkbox" class="new-task-recurring" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}">
           Recurring (resets daily)
         </label>
         <p class="gear-note" style="margin:0;">You can set a due date for this task after adding it.</p>
         <div class="inline-row">
-          <button class="inline-btn cancel cancel-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}">Cancel</button>
-          <button class="inline-btn confirm confirm-task-btn" data-cat-id="${catId}" data-subcat-id="${subcatId}">Add</button>
+          <button class="inline-btn cancel cancel-task-btn" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}">Cancel</button>
+          <button class="inline-btn confirm confirm-task-btn" data-cat-id="${escapeHtml(catId)}" data-subcat-id="${escapeHtml(subcatId)}">Add</button>
         </div>
       </div>
     `;
@@ -1174,8 +1174,8 @@
     document.querySelectorAll('.confirm-task-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const catId = btn.dataset.catId, subcatId = btn.dataset.subcatId;
-        const textInput = document.querySelector(`.new-task-text[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
-        const recurringInput = document.querySelector(`.new-task-recurring[data-cat-id="${catId}"][data-subcat-id="${subcatId}"]`);
+        const textInput = document.querySelector(`.new-task-text[data-cat-id="${escapeHtml(catId)}"][data-subcat-id="${escapeHtml(subcatId)}"]`);
+        const recurringInput = document.querySelector(`.new-task-recurring[data-cat-id="${escapeHtml(catId)}"][data-subcat-id="${escapeHtml(subcatId)}"]`);
         const text = textInput.value.trim();
         if (!text) return;
         await addTask(catId, subcatId, text, recurringInput.checked, null);
@@ -1294,7 +1294,7 @@
     const gearAccount = document.getElementById('gearAccountSection');
     gearAccount.innerHTML = `
       <p class="gear-status">Logged in</p>
-      <p class="gear-email">${user.email}</p>
+      <p class="gear-email">${escapeHtml(user.email)}</p>
       <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());
@@ -1330,7 +1330,7 @@
     state.categories.forEach(cat => {
       cat.subcategories.forEach(sc => {
         sc.tasks.forEach(t => {
-          const path = `${cat.name} &gt; ${sc.name}`;
+          const path = `${cat.name} > ${sc.name}`;
           if (t.recurring && dayCompletions[t.id]) {
             items.push({ text: t.text, path, recurring: true });
           } else if (!t.recurring && t.completedDate === date) {
@@ -1361,15 +1361,15 @@
       const items = getArchiveItemsForDate(date);
       return `
         <div class="archive-date-card">
-          <div class="archive-date-header" data-date="${date}">
+          <div class="archive-date-header" data-date="${escapeHtml(date)}">
             <span>${formatArchiveDate(date)}</span>
             <span class="archive-date-count">${items.length} completed</span>
           </div>
-          <div class="archive-date-body" id="archive-body-${date}">
+          <div class="archive-date-body" id="archive-body-${escapeHtml(date)}">
             ${items.map(item => `
               <div class="archive-item">
-                ${item.text}
-                <span class="archive-item-path">${item.path}${item.recurring ? ' &middot; Recurring' : ''}</span>
+                ${escapeHtml(item.text)}
+                <span class="archive-item-path">${escapeHtml(item.path)}${item.recurring ? ' &middot; Recurring' : ''}</span>
               </div>
             `).join('')}
           </div>

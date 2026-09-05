@@ -45,3 +45,89 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# ---------------------------------------------------------------------------
+# Security headers
+#
+# Deliberately on "/*", not "/*.html". Netlify serves every page at BOTH
+# /goals and /goals.html, and a "/*.html" rule does not match the
+# extensionless form — the same pretty-URL trap that has already cost this
+# site a deploy. Netlify merges matching header rules, so the Cache-Control
+# blocks above still apply.
+#
+# Strict-Transport-Security is missing on purpose: Netlify already sends
+# "max-age=31536000; includeSubDomains; preload" on every response.
+#
+# The Content-Security-Policy line is GENERATED. script-src carries a hash for
+# each inline <script> block in the site, so an injected onerror/handler cannot
+# run even if an escaping bug ever slips through. Never hand-edit the hashes —
+# run `node tests/csp-hash-check.js --update` and commit the result. The same
+# test fails the build if an inline script changed without a regenerate, which
+# would otherwise ship a policy that blanks every page.
+#
+# Two directives are deliberately loose:
+#   style-src 'unsafe-inline'  - the Netlify Identity widget injects an inline
+#     <style>, and the pages use style="" attributes throughout. Style
+#     injection is a far smaller problem than script injection.
+#   connect-src ... identity.netlify.com - measured: the widget only fetches
+#     same-origin today, but it is already trusted to serve executable code, so
+#     allowing it here costs nothing and cannot break login.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://identity.netlify.com 'sha256-/hPgV9aMlpbDeZ0wQ0K2paetitu45Sisgnj5fbz2GCs=' 'sha256-1mO142RKsWLnI1mmkjk6sx/BNnEZFRySz6UMjj2nJ/M=' 'sha256-5T7hlFppLs9M7G2BymTeBBDN82ym+jf2nWPsJPZW3eY=' 'sha256-6XxCMg/bav01zeU8VNzHCys9g9KWTo3UefOk1uQZcm4=' 'sha256-DhQiZ9WpJ0PpuMXJMFsu4YR2Sc3uENTj8zRuFOCDdRw=' 'sha256-HqMwyV/2qJmXh6fqB3Y9j/T1U32sAqZkUEsfDGfbD6c=' 'sha256-QrOBJewgx8sHsLnyaVkK3Gp6q940C/L4ATa86E3F6Zk=' 'sha256-Wk08D1XBPtWvj9YcEf9zs0U6WQjQ09uQbdrL7K2XEMc=' 'sha256-YmvzfsIcKKyrAX1U7KMwIfxEc8GQ4l+6t5BrqfU5XUo=' 'sha256-b+tp4BkJ01PRKhNDzGnrxi+8lnNCUjgWCO0MrBeycz8=' 'sha256-cHYPMf7AxFgG37N2obd0MHz7Oaij38p7jA/lO0Kz/ss=' 'sha256-jW0QzF5eM77tiEaourM4Th3yTib8BXT0lmgJmxZZ0UQ=' 'sha256-luYzHoGzG4+FVySstJw3Py4gOaNOGczP3KcKdA+83H4=' 'sha256-m2ubfHcteocuMGEm9Zm52/4O5P4L2R8YmRQhebw4F7s=' 'sha256-sS96znazFj0G1gYnZQEjhGCSEiR8oQVPfsykXXy2D9M=' 'sha256-vYl23ICM5Sk0lU45UijhaDWefN8i94tiwDr5TAeOzEg=' 'sha256-xlrs35zxFAKBmcB2Xso+Q4AXxPZ9/gU019aHWLfcJCM='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://identity.netlify.com; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+# ---------------------------------------------------------------------------
+# Keep the repo's own files off the web
+#
+# publish = "." means the repo root IS the web root, so CLAUDE.md, the tests,
+# the docs and package.json were all being served publicly (verified: they
+# returned 200). CLAUDE.md alone publishes the storage key names and the
+# incident history. Netlify has no ignore-list for the publish directory, so a
+# forced 404 redirect is the way to hide them. Netlify already withholds
+# netlify.toml itself.
+[[redirects]]
+  from = "/CLAUDE.md"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/package.json"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/package-lock.json"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/tests/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/docs/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/tools/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.claude/*"
+  to = "/404.html"
+  status = 404
+  force = true

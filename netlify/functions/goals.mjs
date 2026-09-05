@@ -12,6 +12,28 @@ import { getStore } from '@netlify/blobs';
    All six functions in this folder are this same file with the store name and
    the empty-state default swapped. Change one and you almost certainly need to
    change all six; tests/functions-test.js runs every one of them. */
+
+/* Every response carrying account data says private, no-store. These bodies
+   are somebody's whole diary or task list, and "no-cache" — which is what
+   Netlify sends by default — only means revalidate, not don't keep a copy. */
+const DATA_HEADERS = {
+  'Content-Type': 'application/json',
+  'Cache-Control': 'private, no-store',
+};
+
+/* A sanity cap, not a quota. Real Rotulus payloads are a few KB; anything near
+   this is a bug or an abuse of the store, and Blobs bills by what it holds.
+   Measured in characters rather than bytes on purpose — it is the number that
+   cannot be misreported by a Content-Length header. */
+const MAX_BODY_CHARS = 512 * 1024;
+
+function json(body, status) {
+  return new Response(JSON.stringify(body), {
+    status: status || 200,
+    headers: DATA_HEADERS,
+  });
+}
+
 export default async (req, context) => {
   /* The 401 stays first, before anything touches the store. It is the only
      thing between a stranger and the data, and it deliberately says nothing
@@ -19,10 +41,7 @@ export default async (req, context) => {
      whether the site's credentials are set. */
   const user = context && context.clientContext && context.clientContext.user;
   if (!user) {
-    return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json({ error: 'Not authenticated' }, 401);
   }
 
   const userKey = `user-${user.sub}`;
@@ -35,23 +54,38 @@ export default async (req, context) => {
 
     if (req.method === 'GET') {
       const data = await store.get(userKey, { type: 'json' });
-      return Response.json(data || { goals: [] });
+      return json(data || { goals: [] });
     }
 
     if (req.method === 'POST') {
-      const body = await req.json();
+      /* Read as text first so the size can be checked before anything parses
+         or stores it, and so a malformed body is a clean 400 rather than a
+         500 that looks like the store failed. */
+      const raw = await req.text();
+      if (raw.length > MAX_BODY_CHARS) {
+        return json({ error: 'Payload too large' }, 413);
+      }
+      let body;
+      try {
+        body = JSON.parse(raw);
+      } catch (e) {
+        return json({ error: 'Body must be JSON' }, 400);
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return json({ error: 'Body must be a JSON object' }, 400);
+      }
       await store.set(userKey, JSON.stringify(body));
-      return Response.json({ ok: true });
+      return json({ ok: true });
     }
 
     return new Response('Method not allowed', { status: 405 });
   } catch (err) {
     /* err.name is the useful half: the Blobs SDK throws by name, which is
-       otherwise indistinguishable from a network blip in the client's banner. */
+       otherwise indistinguishable from a network blip in the client's banner.
+       err.message is deliberately NOT returned — it can carry internal detail,
+       and the console line below puts the whole thing in the Netlify function
+       log, where only the site owner can read it. */
     console.error('Blobs operation failed', err);
-    return new Response(JSON.stringify({
-      error: err.message || 'Server error',
-      name: err.name || 'Error',
-    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return json({ error: 'Server error', name: err.name || 'Error' }, 500);
   }
 };

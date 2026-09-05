@@ -16,10 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="stylesheet" href="/css/rotulus.css?v=7">
+<link rel="stylesheet" href="/css/rotulus.css?v=8">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=7"></script>
+<script defer src="/js/rotulus-shared.js?v=8"></script>
 
 <style>
   /* Page-specific: diary */
@@ -293,7 +293,7 @@
   </div>
 
   <div class="header">
-    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
+    <img class="header-art" src="/assets/header-illustration.png" alt="">
     <p class="eyebrow">Daily log</p>
     <h1 class="title">Diary</h1>
     <p class="subtitle">Tap a date to write or review that day.</p>
@@ -781,7 +781,7 @@
     const gearAccount = document.getElementById('gearAccountSection');
     gearAccount.innerHTML = `
       <p class="gear-status">Logged in</p>
-      <p class="gear-email">${user.email}</p>
+      <p class="gear-email">${escapeHtml(user.email)}</p>
       <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());

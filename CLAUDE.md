@@ -68,11 +68,12 @@ state when the server actually returned something. Keep it that way.
 Regression test: `tests/sync-test.js` runs each page's real script against a
 fake DOM and asserts how many uploads each scenario produces — it is the guard
 against reintroducing the 2026-08-04 wipe. `tests/syntax-check.js` parses every
-inline `<script>`, and `tests/functions-test.js` covers the serverless half (see
-the next section). Nothing needs installing for any of them:
+inline `<script>`, `tests/functions-test.js` covers the serverless half (see
+the next section), and `tests/escaping-test.js` + `tests/csp-hash-check.js`
+guard the two halves of the XSS defence (see Security). Nothing needs installing for any of them:
 
 ```bash
-node tests/functions-test.js && node tests/sync-test.js && node tests/cache-version-check.js && node tests/syntax-check.js && node tests/alarm-test.js
+node tests/functions-test.js && node tests/sync-test.js && node tests/escaping-test.js && node tests/csp-hash-check.js && node tests/cache-version-check.js && node tests/syntax-check.js && node tests/alarm-test.js
 ```
 
 ## The sync functions (`netlify/functions/`)
@@ -582,6 +583,108 @@ Don't reintroduce that pattern on a new page.
 - Custom text lives in `localStorage['scrollswap__labels']`; blanking a
   slot's text in the editor deletes its entry, reverting it to placeholder.
 
+## Security (audit, 2026-09-03)
+
+The whole app was reviewed: every page's inline script, `rotulus-shared.js`,
+`sw.js`, the six functions, `netlify.toml`, the backup/restore path, and the
+live site's actual HTTP responses. Four things were wrong. All four are fixed;
+the rules below are what stops them coming back.
+
+**Escape everything that reaches markup — no exceptions.** Every page builds
+HTML with template strings and `innerHTML`, so anything interpolated is markup
+until it is escaped. Task names, subcategory names, goal names, the habit slot
+labels and `user.email` were all going in raw. So were the `data-*` ids, which
+matters just as much: those come back off the server, so a crafted `id` could
+close its attribute and add a handler. `escapeHtml()` now lives in **all seven
+pages** — deliberately per page, not in `rotulus-shared.js`, because the test
+harnesses run page scripts without the shared file and a shared helper would
+need guarding at every call site.
+
+- Impact is higher than "a broken layout": the Identity widget keeps the GoTrue
+  JWT in `localStorage`, so script on this origin is account takeover plus a
+  readable diary.
+- The realistic delivery route is **Settings → Restore**. Import checks key
+  *names* against the three prefixes; it has never checked values.
+- **`getArchiveItemsForDate()` builds its path with a plain `>`**, not a
+  `&gt;` entity as it used to. The entity was baked in before the value was
+  escaped, so escaping it now would render `&gt;` as visible text.
+- `tests/escaping-test.js` guards it: each page's real script runs against
+  hostile seed data and every `innerHTML` write is checked. It has teeth — the
+  first version of it missed `renderTaskRow` entirely, because task rows only
+  draw inside an *expanded* subcategory, and removing an escape on purpose
+  proved the gap. That is why it stubs `.subcat-header` and fires its click.
+
+**The CSP has no `'unsafe-inline'`, and that is the point.** `script-src` is
+`'self'`, `identity.netlify.com`, and one SHA-256 hash per inline `<script>`.
+An injected `onerror=""` cannot run even if an escape is ever missed.
+
+- **Edit any inline script and the hash changes.** Ship without regenerating
+  and the browser refuses the page's own script — a blank app for everyone
+  until the next deploy. `node tests/csp-hash-check.js --update`, then commit
+  `netlify.toml`. `tests/csp-hash-check.js` fails the build otherwise.
+- **Every block gets two hashes, LF and CRLF.** A hash must match the bytes
+  actually served, and the failure mode if it does not is a blank site rather
+  than anything legible. In practice **LF is the one that matches** — the repo
+  stores LF and Netlify serves the blob (see Working conventions; the belief
+  that the repo was CRLF was wrong, and this dual hashing was originally added
+  to hedge it). It is kept because it costs ~600 bytes of header, needs no
+  thought from whoever edits a script next, and an unused hash permits nothing:
+  a hash only ever allows the exact script it was computed from.
+- **No inline `onerror=""` anywhere.** The seven `<img class="header-art">`
+  handlers moved into `hideMissingArt()` in `rotulus-shared.js`; an inline
+  handler would need `'unsafe-hashes'`, which hands an *injected* handler the
+  same permission. That function checks `complete && naturalWidth === 0`
+  first, because the script is deferred and a missing image may already have
+  failed — `error` does not fire twice. `header-illustration.png` is genuinely
+  absent, so this path runs on every page load.
+- `style-src` keeps `'unsafe-inline'` on purpose: the Identity widget injects
+  an inline `<style>` and the pages use `style=""` throughout. Style injection
+  is a far smaller problem than script injection.
+- Verified in a browser before shipping, because a wrong CSP blanks the site:
+  all eight pages served with the real policy as a `<meta>`, zero violations,
+  every script ran, and `netlifyIdentity` loaded and built its iframes.
+  Measured, not assumed — the widget injects **no** inline script, one inline
+  `<style>`, two `about:blank` iframes, and touches only two origins.
+- Headers sit on `for = "/*"`, **not `"/*.html"`**: Netlify serves every page
+  at `/goals` as well as `/goals.html`, and a `.html` rule misses the bare
+  form. Same pretty-URL trap that has already cost a deploy here.
+- `Strict-Transport-Security` is deliberately absent — Netlify already sends it.
+
+**The repo root was the web root.** `publish = "."` meant `CLAUDE.md`,
+`package.json`, `tests/` and `docs/` were all being served publicly (verified:
+they returned 200 — this file was readable by anyone). Netlify has no
+ignore-list for a publish directory, so `netlify.toml` now has forced 404
+redirects for each. **Add one for any new non-site folder.**
+
+**The six functions validate and no longer leak.** A POST body is read as text,
+capped at 512 KB (413) and rejected unless it parses to a plain object (400) —
+before that, any authenticated account could park megabytes in each store.
+Data responses carry `Cache-Control: private, no-store`; Netlify's default
+`no-cache` only means revalidate, and these bodies are somebody's whole diary.
+The `catch` still returns `err.name` (the half that identifies a Blobs failure)
+but no longer echoes `err.message`, which can carry internal detail — the
+`console.error` puts the full thing in the function log instead.
+
+**Accepted, not fixed: the Identity widget has no integrity check.** All eight
+pages load `identity.netlify.com/v1/netlify-identity-widget.js` unpinned. An
+SRI hash on a mutable `/v1/` path would break login the day Netlify updates it,
+and you would only find out by failing to log in. Self-hosting a pinned copy
+trades that for owning security updates to an auth widget by hand. Decided
+2026-09-03 to leave it: Netlify's CDN already serves the whole site.
+
+**Checked and clean, so don't re-audit these:** no committed secrets; `sw.js`
+has no fetch handler so it cannot serve stale or hostile content; the 401 runs
+before anything touches the store; bearer-token auth means the sync endpoints
+are not CSRF-able; backup import correctly drops keys outside the three
+prefixes; and there is no reachable prototype-pollution path — the merge code
+`Object.assign`s onto fresh objects, which cannot reach `Object.prototype`.
+
+**Two things only you can do, in the Netlify UI:** set Identity → Registration
+to **Invite only** (open registration lets strangers create accounts on the
+site and use its Blobs storage), and delete the now-unused `BLOBS_SITE_ID` /
+`BLOBS_TOKEN` variables. Note also that the diary is stored unencrypted in
+Blobs — inherent to the design, but anyone with your Netlify account can read it.
+
 ## Working conventions (established with this user)
 
 - **Beginner-friendly explanations** — the user built this app from zero
@@ -594,16 +697,23 @@ Don't reintroduce that pattern on a new page.
   push changes, clone `AverageGuyAlex/scroll-swap` fresh to a temp location,
   copy changed/new files over, commit, and push from there — don't `git init`
   in place (would lose history / diverge from the real repo).
-- **Line-ending trap when committing:** this folder is **LF** throughout, but the
-  GitHub repo is **mixed** — `netlify.toml` and `package.json` are **LF** there,
-  every HTML/CSS/JS/test/Markdown file is **CRLF**. Copying edited files straight
-  into a fresh clone marks every line of every file as changed and makes the diff
-  unreviewable. Copy only the files actually edited, then convert **only the CRLF
-  ones** with `perl -pi -e 's/(?<!\r)\n\z/\r\n/' <file>` — running that over
-  `netlify.toml` or `package.json` rewrites them whole for no reason. Check
-  `git diff --stat` before committing — a sane diff is tens of lines, not
-  thousands. **Never run the conversion over a binary file** such as a `.wav`; it
-  corrupts it. Verify a copied binary with `cmp -s` against the source.
+- **Line endings: copy files straight in, convert nothing.** Both this folder and
+  **every blob in the GitHub repo are LF**. Copy only the files actually edited,
+  then check `git diff --stat` — a sane diff is tens or hundreds of lines, not
+  thousands.
+  **This entry used to say the opposite** ("the repo is mixed, HTML/CSS/JS are
+  CRLF, convert them with `perl -pi -e 's/(?<!\r)\n\z/\r\n/'`") and that was
+  wrong. What misled it: a fresh clone on Windows has `core.autocrlf=true`, so
+  git rewrites LF to CRLF **on checkout**. Reading the working tree — with
+  `file`, `grep -U $'\r'`, even `git cat-file` piped through `od` — therefore
+  reports CRLF for files that are LF in the repo. The authoritative check is
+  `git ls-files --eol` (`i/` is the blob, `w/` is the working tree), or compare
+  `git cat-file -s HEAD:<file>` against the byte length of each form.
+  It matters beyond a noisy diff: **Netlify serves the blob, so the served bytes
+  are LF**, which is what a CSP script hash has to match. Running the old
+  conversion on a machine with `autocrlf=false` would have flipped every line of
+  every file. **Never run any such conversion over a binary** such as a `.wav`;
+  it corrupts it. Verify a copied binary with `cmp -s` against the source.
 - The user generates mockups/images themselves (AI-generated) and supplies
   them on request — when a design needs an asset, list exact filenames and
   dimensions and wait for them to drop the files in.

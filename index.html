@@ -16,10 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="stylesheet" href="/css/rotulus.css?v=7">
+<link rel="stylesheet" href="/css/rotulus.css?v=8">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=7"></script>
+<script defer src="/js/rotulus-shared.js?v=8"></script>
 
 <style>
   /* Page-specific: habit tracker */
@@ -271,7 +271,7 @@
   </div>
 
   <div class="header">
-    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
+    <img class="header-art" src="/assets/header-illustration.png" alt="">
     <h1 class="title">Rotulus</h1>
     <p class="subtitle">Five slots a day.<br>Beat the <span class="hl">reflex</span>, not the urge.</p>
   </div>
@@ -330,6 +330,16 @@
   let currentUser = null;
   let syncing = false;
   let syncFailed = false;
+
+  /* Anything that came out of storage or off the server is untrusted text, not
+     markup. Every render here builds HTML with template strings, so a slot label
+     containing a tag would otherwise become part of the page — and script on
+     this origin can read the Identity token that lives in localStorage. */
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
 
   function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -573,8 +583,8 @@
           <div class="slot ${state[s.id] ? 'checked' : ''}" data-id="${s.id}">
             <div class="icon-tile slot-icon">${SLOT_ICONS[s.id] || '✨'}</div>
             <div class="slot-text">
-              <p class="slot-time">${s.time}</p>
-              <p class="slot-swap${s.swap ? '' : ' placeholder'}">${s.swap || s.placeholder}</p>
+              <p class="slot-time">${escapeHtml(s.time)}</p>
+              <p class="slot-swap${s.swap ? '' : ' placeholder'}">${escapeHtml(s.swap || s.placeholder)}</p>
             </div>
             <div class="box ${state[s.id] ? 'checked' : ''}">${checkmarkSVG()}</div>
           </div>
@@ -648,8 +658,8 @@
       <div class="slots">
         ${slots.map(s => `
           <div class="edit-slot">
-            <input type="text" maxlength="40" class="edit-input edit-time-input" data-id="${s.id}" value="${s.time.replace(/"/g, '&quot;')}">
-            <textarea maxlength="200" class="edit-input edit-swap-input" data-id="${s.id}" rows="2" style="resize:vertical;" placeholder="${s.placeholder.replace(/"/g, '&quot;')}">${s.swap}</textarea>
+            <input type="text" maxlength="40" class="edit-input edit-time-input" data-id="${s.id}" value="${escapeHtml(s.time)}">
+            <textarea maxlength="200" class="edit-input edit-swap-input" data-id="${s.id}" rows="2" style="resize:vertical;" placeholder="${escapeHtml(s.placeholder)}">${escapeHtml(s.swap)}</textarea>
           </div>
         `).join('')}
       </div>
@@ -728,7 +738,7 @@
     const gearAccount = document.getElementById('gearAccountSection');
     gearAccount.innerHTML = `
       <p class="gear-status">Logged in</p>
-      <p class="gear-email">${user.email}</p>
+      <p class="gear-email">${escapeHtml(user.email)}</p>
       <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());

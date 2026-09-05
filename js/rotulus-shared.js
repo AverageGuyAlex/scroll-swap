@@ -388,9 +388,31 @@
     if (gear) gear.classList.remove('open');
   });
 
+  /* ------------------------------------------------------- header artwork */
+
+  /* This used to be an inline onerror="" attribute on every page's
+     <img class="header-art">. It moved here so script-src in the CSP can be a
+     plain hash list: an inline event handler needs 'unsafe-hashes', which would
+     hand an injected onerror the same permission and defeat the whole point.
+
+     Order matters. This file is deferred, so a missing image may ALREADY have
+     failed by the time we run, and 'error' does not fire again for it — hence
+     the complete/naturalWidth check first. assets/header-illustration.png is
+     genuinely absent today, so this path runs on every page load. */
+  function hideMissingArt() {
+    var arts = document.querySelectorAll('.header-art');
+    for (var i = 0; i < arts.length; i++) {
+      (function (img) {
+        if (img.complete && img.naturalWidth === 0) { img.style.display = 'none'; return; }
+        img.addEventListener('error', function () { img.style.display = 'none'; });
+      })(arts[i]);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     applyTheme(getTheme(), false);
     buildTabBar();
+    hideMissingArt();
   });
 
   /* Registered from here so every page installs it, though only the pomodoro

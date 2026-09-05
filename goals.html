@@ -16,10 +16,10 @@
 
 <script>try{var t=localStorage.getItem('scrollswap_theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.classList.add('theme-dark');}catch(e){}try{var d=sessionStorage.getItem('rotulus_vt_dir');if(d){document.documentElement.dataset.vtDir=d;sessionStorage.removeItem('rotulus_vt_dir');}}catch(e){}</script>
 
-<link rel="stylesheet" href="/css/rotulus.css?v=7">
+<link rel="stylesheet" href="/css/rotulus.css?v=8">
 
 <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script defer src="/js/rotulus-shared.js?v=7"></script>
+<script defer src="/js/rotulus-shared.js?v=8"></script>
 
 <style>
   /* Page-specific: goals */
@@ -162,7 +162,7 @@
   </div>
 
   <div class="header">
-    <img class="header-art" src="/assets/header-illustration.png" alt="" onerror="this.style.display='none'">
+    <img class="header-art" src="/assets/header-illustration.png" alt="">
     <p class="eyebrow">Long-term</p>
     <h1 class="title">Goals</h1>
     <p class="subtitle">Set a deadline, link your to-do lists, log your hours.</p>
@@ -562,7 +562,7 @@
           <div class="milestone-row">
             <div class="milestone-box"></div>
             <span class="milestone-text" style="color:var(--ink-dim); font-style:italic;">Category removed</span>
-            <button class="icon-btn unlink-btn" data-goal-id="${goal.id}" data-cat-id="${catId}">&times;</button>
+            <button class="icon-btn unlink-btn" data-goal-id="${escapeHtml(goal.id)}" data-cat-id="${escapeHtml(catId)}">&times;</button>
           </div>`;
       }
       const p = categoryProgress(cat);
@@ -571,7 +571,7 @@
           <div class="milestone-box ${p.complete ? 'checked' : ''}">${checkmarkSVG()}</div>
           <span class="milestone-text ${p.complete ? 'checked' : ''}">${escapeHtml(cat.name)}</span>
           ${p.total > 0 ? `<span class="milestone-date">${p.done}/${p.total}</span>` : '<span class="milestone-date">empty</span>'}
-          <button class="icon-btn unlink-btn" data-goal-id="${goal.id}" data-cat-id="${cat.id}">&times;</button>
+          <button class="icon-btn unlink-btn" data-goal-id="${escapeHtml(goal.id)}" data-cat-id="${escapeHtml(cat.id)}">&times;</button>
         </div>`;
     }).join('');
   }
@@ -583,15 +583,15 @@
       return `
         <div class="inline-form" style="margin-top:8px;">
           <p class="empty-note" style="margin:0;">${loadTodoCategories().length ? 'Every category is already linked.' : 'No categories on your To-Do page yet.'}</p>
-          <button class="inline-btn cancel cancel-link-btn" data-goal-id="${goal.id}">Close</button>
+          <button class="inline-btn cancel cancel-link-btn" data-goal-id="${escapeHtml(goal.id)}">Close</button>
         </div>`;
     }
     return `
       <div class="inline-form" style="margin-top:8px;">
         ${available.map(c => `
-          <button class="add-row-btn pick-cat-btn" data-goal-id="${goal.id}" data-cat-id="${c.id}"
+          <button class="add-row-btn pick-cat-btn" data-goal-id="${escapeHtml(goal.id)}" data-cat-id="${escapeHtml(c.id)}"
                   style="text-align:left;">${escapeHtml(c.name)}</button>`).join('')}
-        <button class="inline-btn cancel cancel-link-btn" data-goal-id="${goal.id}">Cancel</button>
+        <button class="inline-btn cancel cancel-link-btn" data-goal-id="${escapeHtml(goal.id)}">Cancel</button>
       </div>`;
   }
 
@@ -603,25 +603,25 @@
     const draft = hoursFormDraft[goal.id] || { date: todayKey(), hours: '' };
 
     return `
-      <div class="goal-card" data-goal-id="${goal.id}">
+      <div class="goal-card" data-goal-id="${escapeHtml(goal.id)}">
         <div class="goal-header">
-          <p class="goal-name ${goal.completed ? 'completed' : ''}">${goal.name}</p>
+          <p class="goal-name ${goal.completed ? 'completed' : ''}">${escapeHtml(goal.name)}</p>
           <div class="goal-actions">
-            <button class="icon-btn delete-goal-btn" data-goal-id="${goal.id}">&times;</button>
+            <button class="icon-btn delete-goal-btn" data-goal-id="${escapeHtml(goal.id)}">&times;</button>
           </div>
         </div>
 
-        <button class="goal-due-btn ${overdue ? 'overdue' : ''}" data-goal-id="${goal.id}">
+        <button class="goal-due-btn ${overdue ? 'overdue' : ''}" data-goal-id="${escapeHtml(goal.id)}">
           ${goal.dueDate ? `Due ${formatShortDate(goal.dueDate)}` : 'Set due date'}
         </button>
 
         ${editingDueDateFor === goal.id ? `
           <div class="due-date-editor">
-            <input type="date" class="inline-input goal-due-date-input" data-goal-id="${goal.id}" value="${goal.dueDate || ''}">
+            <input type="date" class="inline-input goal-due-date-input" data-goal-id="${escapeHtml(goal.id)}" value="${escapeHtml(goal.dueDate || '')}">
             <div class="inline-row">
-              <button class="inline-btn cancel clear-goal-due-btn" data-goal-id="${goal.id}">Clear</button>
-              <button class="inline-btn cancel cancel-goal-due-btn" data-goal-id="${goal.id}">Cancel</button>
-              <button class="inline-btn confirm save-goal-due-btn" data-goal-id="${goal.id}">Save</button>
+              <button class="inline-btn cancel clear-goal-due-btn" data-goal-id="${escapeHtml(goal.id)}">Clear</button>
+              <button class="inline-btn cancel cancel-goal-due-btn" data-goal-id="${escapeHtml(goal.id)}">Cancel</button>
+              <button class="inline-btn confirm save-goal-due-btn" data-goal-id="${escapeHtml(goal.id)}">Save</button>
             </div>
           </div>
         ` : ''}
@@ -631,7 +631,7 @@
           <p class="progress-label">${Math.round(pct)}% of the way to the deadline &middot; ${goalDaysLabel(goal)}</p>
         ` : ''}
 
-        <button class="complete-toggle-btn ${goal.completed ? 'is-complete' : ''}" data-goal-id="${goal.id}">
+        <button class="complete-toggle-btn ${goal.completed ? 'is-complete' : ''}" data-goal-id="${escapeHtml(goal.id)}">
           ${goal.completed ? '&#10003; Completed' : 'Mark as complete'}
         </button>
 
@@ -639,7 +639,7 @@
         ${renderLinkedCategories(goal)}
         ${linkingFor === goal.id
           ? renderCategoryPicker(goal)
-          : `<button class="add-row-btn add-link-trigger" data-goal-id="${goal.id}">+ Link a to-do category</button>`}
+          : `<button class="add-row-btn add-link-trigger" data-goal-id="${escapeHtml(goal.id)}">+ Link a to-do category</button>`}
 
         <p class="goal-section-title">Hours worked</p>
         <div class="hours-total-row">
@@ -647,14 +647,14 @@
           <span class="hours-total-label">total hours logged</span>
         </div>
         <div class="hours-form">
-          <input type="date" class="hours-date-input" data-goal-id="${goal.id}" id="hours-date-${goal.id}" value="${draft.date}">
-          <input type="number" step="0.25" min="0" class="hours-num-input" data-goal-id="${goal.id}" id="hours-num-${goal.id}" placeholder="Hours" value="${draft.hours}">
-          <button class="hours-save-btn save-hours-btn" data-goal-id="${goal.id}">Save</button>
+          <input type="date" class="hours-date-input" data-goal-id="${escapeHtml(goal.id)}" id="hours-date-${escapeHtml(goal.id)}" value="${escapeHtml(draft.date)}">
+          <input type="number" step="0.25" min="0" class="hours-num-input" data-goal-id="${escapeHtml(goal.id)}" id="hours-num-${escapeHtml(goal.id)}" placeholder="Hours" value="${escapeHtml(draft.hours)}">
+          <button class="hours-save-btn save-hours-btn" data-goal-id="${escapeHtml(goal.id)}">Save</button>
         </div>
         ${sortedHours.length > 0 ? sortedHours.map(date => `
-          <div class="hours-entry-row edit-hours-entry" data-goal-id="${goal.id}" data-date="${date}" data-hours="${goal.dailyHours[date]}">
+          <div class="hours-entry-row edit-hours-entry" data-goal-id="${escapeHtml(goal.id)}" data-date="${escapeHtml(date)}" data-hours="${escapeHtml(goal.dailyHours[date])}">
             <span>${formatShortDate(date)}</span>
-            <span>${goal.dailyHours[date]}h</span>
+            <span>${escapeHtml(goal.dailyHours[date])}h</span>
           </div>
         `).join('') : '<p class="empty-note" style="padding:8px 0;">No hours logged yet</p>'}
       </div>
@@ -766,7 +766,7 @@
     const gearAccount = document.getElementById('gearAccountSection');
     gearAccount.innerHTML = `
       <p class="gear-status">Logged in</p>
-      <p class="gear-email">${user.email}</p>
+      <p class="gear-email">${escapeHtml(user.email)}</p>
       <button class="auth-btn secondary" id="logoutBtn" style="width:100%;">Log out</button>
     `;
     document.getElementById('logoutBtn').addEventListener('click', () => netlifyIdentity.logout());

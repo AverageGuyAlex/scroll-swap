@@ -7,6 +7,10 @@
  *   - a missing env var is reported by name instead of crashing the function
  *   - a rejected credential keeps err.name, which is the half that identifies it
  *   - the happy path still reads and writes under user-<sub>
+ *   - a junk or oversized body is a clean 4xx, not a 500 that looks like the
+ *     store broke
+ *   - responses carrying account data are never cacheable, and never echo the
+ *     raw error message back to the client
  *
  * The functions became V2 ES modules on 2026-09-02, so @netlify/blobs can no
  * longer be stubbed by patching Module._load — an ESM import goes straight past
@@ -51,6 +55,15 @@ function request(method, body) {
     method,
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+  });
+}
+
+// Same, but with the body passed through verbatim - for junk and oversized payloads.
+function rawRequest(method, text) {
+  return new Request('https://rotulus.netlify.app/.netlify/functions/x', {
+    method,
+    body: text,
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -124,6 +137,39 @@ const NO_USER = { clientContext: {} };
     // G. Anything but GET/POST.
     res = await handler(request('DELETE'), USER);
     check('G. DELETE -> 405', 405, res.status);
+
+    /* H. Bodies that are not a JSON object. These used to go straight into the
+          store: JSON.stringify(undefined) is not a string, and a bare array or
+          number is not a shape any page can read back. */
+    written = null;
+    res = await handler(rawRequest('POST', 'not json at all'), USER);
+    check('H. junk body -> 400', 400, res.status);
+    check('H. junk body -> nothing written', null, written);
+
+    res = await handler(request('POST', [1, 2, 3]), USER);
+    check('H. array body -> 400', 400, res.status);
+    check('H. array body -> nothing written', null, written);
+
+    /* I. A sanity cap on size. Real payloads are a few KB; Blobs bills by what
+          it holds, and an authenticated caller could otherwise park megabytes
+          in each of the six stores. */
+    res = await handler(rawRequest('POST', '"' + 'x'.repeat(600 * 1024) + '"'), USER);
+    check('I. oversized body -> 413', 413, res.status);
+    check('I. oversized body -> nothing written', null, written);
+
+    /* J. These bodies are somebody's whole diary. Netlify's default is
+          "no-cache", which means revalidate - not "do not keep a copy". */
+    getStoreImpl = () => ({ get: async () => ({ hello: 'world' }), set: async () => {} });
+    res = await handler(request('GET'), USER);
+    check('J. GET -> private, no-store', 'private, no-store', res.headers.get('Cache-Control'));
+
+    /* K. The raw message can carry internal Blobs detail. err.name stays,
+          because that is the half that identifies the failure in the browser. */
+    getStoreImpl = () => { const e = new Error('bucket rotulus-xyz at internal.host rejected'); e.name = 'BlobsInternalError'; throw e; };
+    res = await handler(request('GET'), USER);
+    const leaked = await readBody(res);
+    check('K. 500 keeps err.name', 'BlobsInternalError', leaked.name);
+    check('K. 500 does not echo err.message', false, JSON.stringify(leaked).indexOf('internal.host') !== -1);
 
     getStoreImpl = () => ({});
   }
